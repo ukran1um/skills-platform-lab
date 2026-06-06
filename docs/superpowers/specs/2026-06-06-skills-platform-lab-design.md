@@ -166,7 +166,9 @@ cases:
         extract: correlation_value      # harness pulls the number from the result
         expect: {recompute: pearson, tolerance: 0.02}
       - type: trajectory
-        expect: {must_call: [get_returns], must_not_call: [run_query]}
+        expect: {must_call: [compute_correlation], must_not_call: [run_query]}
+        # tool names are the skill's local tools/ functions; in platform context
+        # those functions wrap MCP calls, so the assertion holds in both contexts
   - id: brief_quality                   # market_brief style
     input: "One-paragraph brief on NVDA"
     checks:
@@ -185,7 +187,10 @@ Three check types:
 
 - A `common/eval_harness` pytest plugin.
 - Instantiates the skill via the same loader the skill host uses (shared code, deliberately).
-- Points at a **staging Data MCP**: the same server binary launched as a subprocess against a small fixtures parquet, so evals never depend on live ingested data.
+- Two data backends, by milestone:
+  - **M2 (laptop mode):** the skill's tools read a small fixtures parquet directly — no MCP dependency, so the harness works before the Data MCP exists.
+  - **M4 onward (staging mode):** the harness launches a **staging Data MCP** — the same server binary as a subprocess against the fixtures parquet — and evals run with the platform-context tool path. Both modes stay available; CI uses staging mode once it exists.
+- Evals never depend on live ingested data in either mode.
 - Output: per-case scores, mean compared to the frontmatter `threshold`, JSON report.
 
 ### CI pipeline (GitHub Actions, path-filtered per skill)
@@ -198,7 +203,7 @@ Three check types:
 
 Static gates run before the eval gate so a lint failure never burns API spend. Branch protection on `main`: PRs only, CI green required.
 
-**M3 demo moment:** the `rogue_skill` PR passes gates 1, 3, 4 and dies on gate 2 — governance catching a skill that lies about its tool surface while its evals pass.
+**M3 demo moment:** the `rogue_skill` PR passes the static gates and dies on gate 2 (fail-fast: gates 3–5 never run, so no eval spend). Its evals pass when run locally — which is the point: governance catches a skill that lies about its tool surface even when its outputs are good.
 
 ## Error handling
 
