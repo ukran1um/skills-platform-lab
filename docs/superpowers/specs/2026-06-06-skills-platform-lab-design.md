@@ -20,8 +20,10 @@ This is a sanitized, generic-named, public-data-only project. It may become a pu
 - Chat, notebook, or marketplace surfaces
 - Router / intent classification (skill host takes an explicit skill name)
 - Session manager / event sourcing
-- Async job handles (possible M6 stretch)
+- Async job handles
 - Asymmetric JWKS key distribution, OAuth dynamic client registration (HS256 shared secret suffices for the lesson)
+- Vector store / embeddings for the knowledge base (BM25 over markdown, per the Karpathy small-scale observation)
+- Synthetic data generation / fine-tuning over the KB (Karpathy's "further explorations" — noted, not built)
 
 ## Decisions log
 
@@ -32,7 +34,9 @@ This is a sanitized, generic-named, public-data-only project. It may become a pu
 | Eval billing in CI | Anthropic API key (Console + prepaid credits) as repo secret |
 | Models | Sonnet for skill agent and judge; Haiku as cheap CI fallback if cost annoys |
 | Stack | Python 3.12, uv workspace, Claude Agent SDK, MCP Python SDK (FastMCP), DuckDB + Parquet, GitHub Actions, PyJWT (HS256), pytest |
-| Demo skills | `factor_correlation` (numeric, deterministic evals) and `market_brief` (free text, judge evals), plus `rogue_skill` as a rejected PR |
+| Demo skills | `factor_correlation` (numeric, deterministic evals) and `market_brief` (free text, judge evals), plus `rogue_skill` as a rejected PR; `kb_compile` and `kb_qa` in the KB extension |
+| Knowledge base | Separate private repo `agents-kb` (AI-agents research topic), Karpathy raw/ + wiki/ pattern, Obsidian as human frontend, distributed by git clone/pull |
+| KB placement | M6–M7, after the governance core lands; replaces prior M6 stretch ideas |
 
 ## Architecture
 
@@ -153,6 +157,61 @@ All read-only, all token-checked:
 
 Wire behavior (modeled on live-probed public servers, June 2026): Streamable HTTP transport, SSE-framed JSON-RPC responses, `401 + WWW-Authenticate: Bearer resource_metadata=...` challenge on missing/invalid token (the Stripe pattern), scope denial as an in-protocol JSON-RPC error. Both failure styles intentionally observable.
 
+## Knowledge-base extension (M6–M7)
+
+The Karpathy LLM-knowledge-base pattern (raw sources → LLM-compiled markdown wiki → Obsidian as viewer → agent Q&A → outputs filed back), integrated as a platform extension. This is also the "knowledge base track" pattern referenced in the source research.
+
+### `agents-kb`: a separate, private companion repo
+
+```
+agents-kb/                        # own git repo, cloned to ~/Projects/learning/agents-kb
+├── raw/                          # source documents: clipped articles (Obsidian Web Clipper),
+│                                 # papers, images — never edited after ingest
+├── wiki/                         # LLM-compiled: concept articles, summaries, backlinks,
+│                                 # index files. Maintained by skills, rarely by hand
+│   └── _index.md                 # the auto-maintained map the agent reads first
+└── .obsidian/                    # vault config (gitignored except essentials)
+```
+
+Topic: AI-agents research. Seed corpus: existing notes (`agentic-ai-landscape-march-2026.md`) plus clipped public sources (Anthropic engineering posts, MCP spec, runtime docs). The KB stays private — it is personal research, decoupled from the platform repo's later flip to public.
+
+**Distribution is git.** "Download the knowledge" = clone; "sync" = pull. One repo, three consumers:
+
+1. **Obsidian** (human frontend): open the clone as a vault. Backlinks/graph view come free since the wiki is markdown-with-wikilinks.
+2. **Local Claude Code**: reads files directly — index files + summaries instead of RAG, per Karpathy's small-scale observation.
+3. **The platform**: `research_mcp` (below) over a configured clone path.
+
+### Research MCP
+
+Same FastMCP/JWT skeleton as the Data MCP, over the KB clone:
+
+| Tool | Scope | Notes |
+|---|---|---|
+| `search_kb(query)` | `kb:read` | BM25 over markdown (rank-bm25), Karpathy's "naive search engine" as an MCP tool. No vector store |
+| `read_doc(path)` | `kb:read` | Returns a wiki or raw document |
+| `list_index()` | `kb:read` | Returns `_index.md` |
+| `file_note(path, content)` | `kb:write` | Writes into `wiki/` only (never `raw/`); commits to a branch, never to main |
+
+`entitlements.yaml` vocabulary gains `kb:read`, `kb:write`.
+
+### Two new skills
+
+| | `kb_compile` | `kb_qa` v0.1.0 → v0.2.0 |
+|---|---|---|
+| Purpose | Compile `raw/` items into wiki articles with backlinks; update `_index.md` | Answer questions citing wiki articles; v0.2.0 files its answers back into the wiki (Karpathy's "outputs add up" loop) |
+| `blast_radius` | medium (writes) | v0.1.0: low (read-only) → v0.2.0: medium (write-back) |
+| `allowed_mcp_servers` | `research_mcp` | `research_mcp` |
+| `required_scopes` | `kb:read`, `kb:write` | v0.1.0: `kb:read` → v0.2.0: + `kb:write` |
+| Eval type | Judge: article faithful to raw source, links resolve, index updated (an open eval-design problem — that's the point) | Judge: answer cites real wiki docs; trajectory: `must_call: [search_kb]`; citation paths verified to exist deterministically |
+
+**The escalation demo (replaces the earlier market_brief v0.2.0 idea):** `kb_qa` v0.1.0 is blessed as a low/read-only skill. v0.2.0 requests `kb:write` and `blast_radius: medium` — the diff triggers the heavier review tier in CI (medium+ requires explicit registry YAML sign-off before reconcile passes). Blast-radius escalation through the governance pipeline, end to end. `market_brief` stays `data_mcp`-only.
+
+### KB safety rails
+
+- `file_note` writes are branch-only; a human merges KB changes (the KB has its own lighter governance: review-on-merge, no eval gate)
+- `raw/` is append-only by convention; CI on the KB repo (single check) fails if a PR modifies existing `raw/` files
+- Wiki lint (`kb_compile`'s health-check mode): dangling wikilinks, raw items missing from the index — Karpathy's "linting" pass as a skill invocation rather than a hand-run script
+
 ## Eval harness and CI gates
 
 ### Golden set format (`evals/golden.yaml`)
@@ -233,9 +292,10 @@ Implementation follows TDD discipline (superpowers). The AST scanner is the high
 | **M3** | Full CI governance | PR gates live; `rogue_skill` PR rejected by AST gate; `registry.json` artifact on main |
 | **M4** | Data MCP server | Live locally; wired into Claude Code via `claude mcp add`; 401 and scope-denial curl-verifiable |
 | **M5** | Skill host + promotion demo | `market_brief` authored through full promotion path; both skills runnable via skill host with scoped tokens; end-to-end demo in README |
-| **M6** (stretch) | One of: fresh-session AI review stage in CI, or async Compute-MCP-style job handle | Optional |
+| **M6** | `agents-kb` repo + Research MCP + Obsidian | KB repo seeded (≥10 raw items; ≥5 bootstrap wiki pages compiled via local Claude Code — the ungoverned phase, formalized by `kb_compile` in M7); Obsidian vault opens it; `research_mcp` live with `search_kb`/`read_doc`/`list_index`/`file_note`; curl-verifiable kb:read vs kb:write scope denial |
+| **M7** | KB skills + escalation demo | `kb_compile` blessed (medium, write) and compiling new raw items; `kb_qa` v0.1.0 blessed read-only; v0.2.0 escalation to kb:write demonstrated through the heavier review tier |
 
-Estimated effort: roughly two weekends plus a few evenings.
+Estimated effort: roughly two weekends plus a few evenings for the core (M0–M5); two to three more evenings for the KB extension (M6–M7).
 
 ## Risks / known open questions
 
