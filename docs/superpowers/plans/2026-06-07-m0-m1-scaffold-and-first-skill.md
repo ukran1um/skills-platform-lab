@@ -1017,3 +1017,12 @@ git push
 - **Type consistency:** `make_prices`/`parse_stooq_csv`/`get_prices` all emit `(ticker: str, date: datetime.date, close: float)`; `daily_returns` pivots on those names; `run()` consumes both. `write_parquet(out_path)` signature matches all call sites.
 - **Placeholder scan:** clean — every code step has complete code; every run step has a command and expected output.
 - **Known risk:** Stooq throttling or symbol misses during Task 3 Step 6 — the skip-and-report loop tolerates partial failure; acceptance requires "a few FAILED at most," and failures go to LEARNINGS.md.
+
+## Carryover into M2 (from the M0+M1 final integration review)
+
+Two forward-looking items the final review surfaced. Neither is an M0+M1 defect (M0+M1 acceptance is met); both are M2 scope, recorded here so the M2 plan picks them up.
+
+1. **Create `skills/factor_correlation/evals/golden.yaml`.** SKILL.md frontmatter already references it (`eval.golden_set: evals/golden.yaml`) but the file does not exist yet — it's the M2 deliverable. Until it exists, any SKILL.md-frontmatter consumer (the M3 blast-radius scanner, the eval runner) would hit a dangling path. First task of M2.
+2. **Make `factor_correlation`'s dependence on `lab_data` explicit before standalone extraction.** Tests import `lab_data.fixtures.write_parquet`; in the workspace venv this resolves fine, but when M4 runs the skill in an isolated skill-host/container the import would break. Fix in M2 by either adding `lab-data` to `factor_correlation`'s dev dependencies or moving the `write_parquet` test helper into a workspace-root `conftest.py`.
+
+Already addressed during the final review (not carryover): `cli.run()` now accepts a `parquet=` kwarg so the M2 harness can target a fixtures warehouse without `$PRICES_PARQUET` monkeypatching. `fetch.py:get_prices` is confirmed the single data-access seam for the M4 direct-parquet → Data-MCP swap.

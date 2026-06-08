@@ -15,6 +15,15 @@ def warehouse_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return path
 
 
+def test_run_accepts_parquet_kwarg_without_env(tmp_path: Path):
+    # The M2 harness seam: point run() at a fixtures warehouse via the kwarg,
+    # with no $PRICES_PARQUET set.
+    path = write_parquet(tmp_path / "prices.parquet")
+    result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30), parquet=path)
+    assert result["tickers"] == ["AAPL", "MSFT"]
+    assert "correlation_value" in result
+
+
 def test_run_two_tickers_has_correlation_value(warehouse_env: Path):
     result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30))
     assert result["tickers"] == ["AAPL", "MSFT"]

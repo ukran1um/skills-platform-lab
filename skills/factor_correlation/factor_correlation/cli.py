@@ -5,14 +5,19 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from factor_correlation.tools.compute import correlation_matrix
 from factor_correlation.tools.fetch import get_prices
 
 
-def run(tickers: list[str], start: date, end: date) -> dict[str, Any]:
-    prices = get_prices(tickers, start, end)
+def run(
+    tickers: list[str], start: date, end: date, parquet: Path | None = None
+) -> dict[str, Any]:
+    # `parquet` lets a caller (e.g. the M2 eval harness) point at a fixtures
+    # warehouse without touching $PRICES_PARQUET; None falls through to the default.
+    prices = get_prices(tickers, start, end, parquet=parquet)
     if prices.empty:
         raise SystemExit(f"no price data for {tickers} between {start} and {end}")
     corr = correlation_matrix(prices)
