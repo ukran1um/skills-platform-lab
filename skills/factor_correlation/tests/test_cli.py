@@ -34,3 +34,9 @@ def test_run_three_tickers_matrix_only(warehouse_env: Path):
 def test_run_unknown_ticker_exits(warehouse_env: Path):
     with pytest.raises(SystemExit, match="no price data"):
         run(["ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30))
+
+
+def test_run_partial_unknown_exits(warehouse_env: Path):
+    # Some tickers present, some absent: must fail loudly, naming the missing one.
+    with pytest.raises(SystemExit, match="ZZZTOP"):
+        run(["AAPL", "ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30))

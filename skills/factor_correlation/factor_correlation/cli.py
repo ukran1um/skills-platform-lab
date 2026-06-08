@@ -17,6 +17,12 @@ def run(tickers: list[str], start: date, end: date) -> dict[str, Any]:
         raise SystemExit(f"no price data for {tickers} between {start} and {end}")
     corr = correlation_matrix(prices)
     cols = sorted(corr.columns.tolist())
+    # Honor SKILL.md's "name it and stop" rule: a partially-missing request
+    # (some tickers present, some absent) must fail loudly rather than silently
+    # dropping the absent ones from the matrix.
+    missing = [t.upper() for t in tickers if t.upper() not in cols]
+    if missing:
+        raise SystemExit(f"ticker(s) not found in warehouse: {', '.join(sorted(missing))}")
     result: dict[str, Any] = {
         "tickers": cols,
         "start": start.isoformat(),
