@@ -1,0 +1,24 @@
+[project]
+name = "skills-platform-lab"
+version = "0.1.0"
+description = "Governed skills platform prototype: registry monorepo, eval-gated CI, capability-token MCP, skill host"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = ["data", "skills/*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+exclude = ["\\.venv"]
