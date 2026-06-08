@@ -1,62 +1,57 @@
-"""Download daily closes from Stooq into the warehouse parquet."""
+"""Download daily adjusted closes from Yahoo Finance into the warehouse parquet."""
 
 from __future__ import annotations
 
 import argparse
-import io
-import time
 from pathlib import Path
 
 import pandas as pd
-import requests
-
-STOOQ_URL = "https://stooq.com/q/d/l/?s={symbol}&i=d"
+import yfinance as yf
 
 
-def stooq_symbol(ticker: str) -> str:
-    return f"{ticker.lower()}.us"
+def normalize_closes(close_wide: pd.DataFrame) -> pd.DataFrame:
+    """Wide (index=date, columns=ticker) closes -> long (ticker, date, close).
+
+    Drops missing closes, sorts by (ticker, date).
+    """
+    long = close_wide.stack().rename("close").reset_index()
+    long.columns = ["date", "ticker", "close"]
+    long["date"] = pd.to_datetime(long["date"]).dt.date
+    long["close"] = long["close"].astype(float)
+    long = long.dropna(subset=["close"])
+    long = long[["ticker", "date", "close"]].sort_values(["ticker", "date"])
+    return long.reset_index(drop=True)
 
 
-def parse_stooq_csv(ticker: str, csv_text: str) -> pd.DataFrame:
-    df = pd.read_csv(io.StringIO(csv_text))
-    if "Close" not in df.columns:
-        raise ValueError(f"unexpected response for {ticker}: {csv_text[:80]!r}")
-    return pd.DataFrame(
-        {
-            "ticker": ticker.upper(),
-            "date": pd.to_datetime(df["Date"]).dt.date,
-            "close": df["Close"].astype(float),
-        }
+def download_prices(tickers: list[str], start: str, end: str | None) -> pd.DataFrame:
+    """Batch-download adjusted closes for all tickers in one call."""
+    raw = yf.download(
+        tickers, start=start, end=end, auto_adjust=True, progress=False
     )
-
-
-def fetch_ticker(ticker: str, session: requests.Session) -> pd.DataFrame:
-    resp = session.get(STOOQ_URL.format(symbol=stooq_symbol(ticker)), timeout=30)
-    resp.raise_for_status()
-    return parse_stooq_csv(ticker, resp.text)
+    close = raw["Close"]
+    if isinstance(close, pd.Series):  # single-ticker shape
+        close = close.to_frame(tickers[0])
+    return normalize_closes(close)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tickers-file", type=Path, default=Path("data/tickers.txt"))
     parser.add_argument("--out", type=Path, default=Path("data/warehouse/prices.parquet"))
+    parser.add_argument("--start", default="2015-01-01")
+    parser.add_argument("--end", default=None)
     args = parser.parse_args()
     tickers = [t.strip() for t in args.tickers_file.read_text().splitlines() if t.strip()]
-    session = requests.Session()
-    frames = []
-    for i, ticker in enumerate(tickers):
-        try:
-            frames.append(fetch_ticker(ticker, session))
-            print(f"[{i + 1}/{len(tickers)}] {ticker} ok")
-        except Exception as exc:  # noqa: BLE001 — skip-and-report is correct ingest behavior
-            print(f"[{i + 1}/{len(tickers)}] {ticker} FAILED: {exc}")
-        time.sleep(0.5)  # be polite to stooq
-    if not frames:
-        raise SystemExit("no tickers downloaded")
-    df = pd.concat(frames, ignore_index=True)
+    df = download_prices(tickers, args.start, args.end)
+    if df.empty:
+        raise SystemExit("no price data downloaded")
+    got = sorted(df["ticker"].unique())
+    missing = sorted(set(t.upper() for t in tickers) - set(got))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(args.out, index=False)
-    print(f"wrote {len(df)} rows / {df['ticker'].nunique()} tickers to {args.out}")
+    print(f"wrote {len(df)} rows / {len(got)} tickers to {args.out}")
+    if missing:
+        print(f"missing tickers (no data returned): {missing}")
 
 
 if __name__ == "__main__":
