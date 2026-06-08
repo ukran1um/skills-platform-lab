@@ -14,7 +14,13 @@ def normalize_closes(close_wide: pd.DataFrame) -> pd.DataFrame:
 
     Drops missing closes, sorts by (ticker, date).
     """
-    long = close_wide.stack().rename("close").reset_index()
+    # stack() collapses columns into the index; reset_index then yields
+    # [date, ticker, close] in that order regardless of the source frame's
+    # index/column names. future_stack=True silences the pandas 2.x
+    # FutureWarning and keeps NaN rows (we drop them explicitly below).
+    # The iloc guard keeps the positional rename safe if extra levels appear.
+    long = close_wide.stack(future_stack=True).rename("close").reset_index()
+    long = long.iloc[:, :3]
     long.columns = ["date", "ticker", "close"]
     long["date"] = pd.to_datetime(long["date"]).dt.date
     long["close"] = long["close"].astype(float)

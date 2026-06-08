@@ -1,7 +1,7 @@
 [project]
 name = "lab-data"
 version = "0.1.0"
-description = "Price warehouse: synthetic fixtures and Stooq ingest"
+description = "Price warehouse: synthetic fixtures and yfinance ingest"
 requires-python = ">=3.12"
 dependencies = [
     "pandas>=2.2",

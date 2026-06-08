@@ -37,3 +37,18 @@ def test_normalize_closes_sorted():
     by_ticker = long.groupby("ticker")["date"]
     for _, dates in by_ticker:
         assert list(dates) == sorted(dates)
+
+
+def test_normalize_closes_single_ticker_no_column_name():
+    # Mirrors download_prices' single-ticker path: yf returns a Series, which
+    # download_prices converts via close.to_frame(ticker) — a frame whose
+    # columns.name is None. The positional rename must still land correctly.
+    wide = pd.DataFrame(
+        {"AAPL": [100.0, 101.0]},
+        index=pd.to_datetime(["2025-01-02", "2025-01-03"]),
+    )
+    wide.index.name = "Date"  # columns.name intentionally left as None
+    long = normalize_closes(wide)
+    assert list(long.columns) == ["ticker", "date", "close"]
+    assert set(long["ticker"]) == {"AAPL"}
+    assert long["close"].tolist() == [100.0, 101.0]

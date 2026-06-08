@@ -19,7 +19,11 @@ def make_prices(
     end: date = date(2025, 12, 31),
     seed: int = SEED,
 ) -> pd.DataFrame:
-    """Geometric random walk, weekdays only. Same seed -> identical frame."""
+    """Geometric random walk, weekdays only. Same seed -> identical frame.
+
+    Note: per-ticker values depend on position in `tickers` (one RNG drawn
+    sequentially across the list), so changing the list changes downstream values.
+    """
     tickers = tickers or DEFAULT_TICKERS
     rng = np.random.default_rng(seed)
     days = pd.bdate_range(start, end)
