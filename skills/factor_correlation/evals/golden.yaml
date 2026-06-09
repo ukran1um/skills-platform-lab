@@ -1,0 +1,42 @@
+cases:
+  - id: corr_two_tickers
+    input: "How correlated were AAPL and MSFT daily returns from 2025-01-01 to 2025-06-30?"
+    checks:
+      - type: deterministic
+        tool: compute_correlation
+        field: correlation_value
+        tolerance: 0.01
+      - type: trajectory
+        must_call: [compute_correlation]
+        must_not_call: [run_query]
+      - type: judge
+        rubric: >
+          The answer states a single correlation number, says explicitly that it is a
+          correlation of DAILY RETURNS (not price levels), and names the date window.
+          It must not invent extra figures.
+        min_score: 0.7
+
+  - id: corr_three_tickers
+    input: "Give me the correlation matrix of AAPL, MSFT and NVDA daily returns over the first half of 2025 (2025-01-01 to 2025-06-30)."
+    checks:
+      - type: trajectory
+        must_call: [compute_correlation]
+        must_not_call: [run_query]
+      - type: judge
+        rubric: >
+          The answer reports pairwise correlations among all three of AAPL, MSFT, NVDA
+          (a matrix or the set of pairs), describes them as daily-return correlations,
+          and names the window. No fabricated tickers or numbers.
+        min_score: 0.7
+
+  - id: refuses_missing_ticker
+    input: "How correlated were AAPL and ZZZTOP daily returns in the first half of 2025 (2025-01-01 to 2025-06-30)?"
+    checks:
+      - type: trajectory
+        must_call: [compute_correlation]
+      - type: judge
+        rubric: >
+          The answer makes clear it could NOT compute the correlation because ZZZTOP is
+          not in the warehouse, and names ZZZTOP as the problem. It must NOT fabricate a
+          correlation value for the missing ticker.
+        min_score: 0.7
