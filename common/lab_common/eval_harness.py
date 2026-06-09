@@ -28,7 +28,13 @@ def load_golden(path: str | Path) -> list[dict[str, Any]]:
 
 
 def _load_agent_tools(spec: SkillSpec):
-    module = importlib.import_module(f"{spec.name}.agent_tools")
+    try:
+        module = importlib.import_module(f"{spec.name}.agent_tools")
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            f"Could not import '{spec.name}.agent_tools'. "
+            f"The skill's package name must match its SKILL.md name (got: {spec.name!r})."
+        ) from exc
     return module.TOOLS, module.dispatch
 
 
@@ -62,13 +68,28 @@ def run_evals(
     cases = load_golden(golden_path)
     tools, dispatch = _load_agent_tools(spec)
 
+    has_judge = any(c["type"] == "judge" for case in cases for c in case["checks"])
+    if has_judge and judge_client is None:
+        raise ValueError("golden set contains judge checks but judge_client is None")
+
     case_results: list[CaseResult] = []
     for case in cases:
-        run = run_skill(
-            spec, case["input"], tools, dispatch,
-            client=agent_client, context=context, model=model,
-        )
-        case_results.append(_score_case(case, run, judge_client=judge_client, context=context))
+        # One erroring case must not abort the whole run — record it as a 0-score
+        # case (with the error in the detail) and keep going.
+        try:
+            run = run_skill(
+                spec, case["input"], tools, dispatch,
+                client=agent_client, context=context, model=model,
+            )
+            case_results.append(_score_case(case, run, judge_client=judge_client, context=context))
+        except Exception as exc:  # noqa: BLE001 — resilience is the point here
+            case_results.append(
+                CaseResult(
+                    case_id=case["id"],
+                    checks=[CheckResult("error", False, 0.0, str(exc))],
+                    score=0.0,
+                )
+            )
 
     mean = statistics.mean(c.score for c in case_results) if case_results else 0.0
     return EvalReport(
@@ -89,6 +110,26 @@ def _print_report(report: EvalReport) -> None:
             print(f"    [{mark}] {chk.type} ({chk.score:.3f}) {chk.detail}")
     verdict = "PASS" if report.passed else "FAIL"
     print(f"  MEAN {report.mean_score:.3f} vs threshold {report.threshold} -> {verdict}\n")
+
+
+def _report_to_dict(report: EvalReport) -> dict[str, Any]:
+    return {
+        "skill": report.skill,
+        "mean_score": report.mean_score,
+        "threshold": report.threshold,
+        "passed": report.passed,
+        "cases": [
+            {
+                "case_id": c.case_id,
+                "score": c.score,
+                "checks": [
+                    {"type": k.type, "passed": k.passed, "score": k.score, "detail": k.detail}
+                    for k in c.checks
+                ],
+            }
+            for c in report.cases
+        ],
+    }
 
 
 def main() -> None:
@@ -119,26 +160,6 @@ def main() -> None:
         args.report.write_text(json.dumps(_report_to_dict(report), indent=2))
         print(f"wrote {args.report}")
     sys.exit(0 if report.passed else 1)
-
-
-def _report_to_dict(report: EvalReport) -> dict[str, Any]:
-    return {
-        "skill": report.skill,
-        "mean_score": report.mean_score,
-        "threshold": report.threshold,
-        "passed": report.passed,
-        "cases": [
-            {
-                "case_id": c.case_id,
-                "score": c.score,
-                "checks": [
-                    {"type": k.type, "passed": k.passed, "score": k.score, "detail": k.detail}
-                    for k in c.checks
-                ],
-            }
-            for c in report.cases
-        ],
-    }
 
 
 if __name__ == "__main__":
