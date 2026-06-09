@@ -13,21 +13,19 @@ eval:
 
 # Factor Correlation
 
-Compute return correlations between tickers over a date window.
+Answer questions about how stock/ETF returns relate over a date window, using the tools provided.
 
-## How to run
+## Available tools
+- `list_tickers` — which tickers exist in the warehouse.
+- `compute_correlation(tickers, start, end)` — Pearson correlation of daily returns; returns a matrix (and a correlation_value for two tickers). Use for correlations.
+- `get_returns_stats(ticker, start, end)` — mean daily return, volatility, n_days for one ticker. Use for volatility/return stats.
+- `run_sql(query)` — read-only SELECT over `prices(ticker, date, close)`. Use ONLY for questions the typed tools cannot answer (e.g. max/min close).
 
-From the repo root:
-
-    uv run python -m factor_correlation.cli AAPL MSFT --start 2025-01-01 --end 2025-12-31
-
-- Output is JSON: a `matrix` of pairwise Pearson correlations of daily returns,
-  plus a top-level `correlation_value` when exactly two tickers are given.
-- Data comes from `data/warehouse/prices.parquet` (override with $PRICES_PARQUET).
-  If the warehouse file is missing, run `uv run python -m lab_data.ingest` first.
+## How to work
+- Prefer the typed tools over `run_sql` whenever they cover the question.
+- For "which is more correlated" questions, call `compute_correlation` once for all tickers, then compare.
 
 ## Reporting rules
-
 - Report correlations to two decimal places and name the date window used.
-- These are correlations of daily returns, not price levels — say so explicitly.
-- If a ticker is missing from the warehouse, name it and stop; never guess values.
+- These are correlations of DAILY RETURNS, not price levels — say so explicitly.
+- If a requested ticker is missing from the warehouse, name it and stop; never guess values.

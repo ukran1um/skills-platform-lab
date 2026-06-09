@@ -1,12 +1,9 @@
-"""Live smoke test: runs the real harness against the fixtures parquet.
-
-Marked `eval` so it is deselected by the default `pytest` run. Run explicitly with:
-    uv run pytest -m eval
-It is skipped if ANTHROPIC_API_KEY is not set.
-"""
+"""Live smoke: real Agent-SDK run + DeepEval scoring against the fixtures parquet.
+Marked `eval` (deselected by default). Run: uv run pytest -m eval. Needs the claude CLI + key."""
 
 from __future__ import annotations
 
+import importlib
 import os
 from pathlib import Path
 
@@ -19,22 +16,19 @@ FACTOR_SKILL = REPO_ROOT / "skills" / "factor_correlation"
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="no ANTHROPIC_API_KEY")
-def test_live_eval_runs_and_scores(fixtures_parquet: Path):
-    import anthropic
-
+def test_live_eval_runs(fixtures_parquet: Path):
+    from lab_common.agent_runner import make_sdk_runner
+    from lab_common.deepeval_metrics import make_judge
     from lab_common.eval_harness import run_evals
+    from lab_common.skill_spec import load_skill
 
-    client = anthropic.Anthropic()
-    report = run_evals(  # type: ignore[call-arg]
-        FACTOR_SKILL,
-        agent_client=client,
-        judge_client=client,
-        context={"parquet": fixtures_parquet},
-        model="claude-haiku-4-5",
-        judge_model="claude-haiku-4-5",  # keep the smoke test cheap
-    )
-    assert report.skill == "factor_correlation"
-    assert len(report.cases) == 3
-    two = next(c for c in report.cases if c.case_id == "corr_two_tickers")
-    det = next(k for k in two.checks if k.type == "deterministic")
-    assert det.passed, f"deterministic failed: {det.detail}"
+    os.environ["PRICES_PARQUET"] = str(fixtures_parquet)
+    spec = load_skill(FACTOR_SKILL)
+    mod = importlib.import_module("factor_correlation.agent_tools")
+    runner = make_sdk_runner(spec, mod.SERVER, mod.ALLOWED_TOOLS, "claude-haiku-4-5")
+    judge, _ = make_judge()
+    report = run_evals(FACTOR_SKILL, runner=runner, judge=judge, parquet=fixtures_parquet)
+    assert len(report.cases) == 4
+    det = next(k for c in report.cases if c.case_id == "corr_two_tickers"
+               for k in c.checks if k.type == "deterministic")
+    assert det.passed, det.detail

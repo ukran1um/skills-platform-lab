@@ -244,13 +244,13 @@ Three check types:
 
 ### Harness mechanics
 
-- A `common/eval_harness` pytest plugin.
-- Instantiates the skill via the same loader the skill host uses (shared code, deliberately).
-- Two data backends, by milestone:
-  - **M2 (laptop mode):** the skill's tools read a small fixtures parquet directly — no MCP dependency, so the harness works before the Data MCP exists.
-  - **M4 onward (staging mode):** the harness launches a **staging Data MCP** — the same server binary as a subprocess against the fixtures parquet — and evals run with the platform-context tool path. Both modes stay available; CI uses staging mode once it exists.
-- Evals never depend on live ingested data in either mode.
+- `lab_common.eval_harness.run_evals(skill_dir, *, runner, judge, parquet, golden_path=None)` — DeepEval-native harness.
+- Runs each golden-set case through the **Claude Agent SDK** (the same runtime the M5 skill-host uses), isolated via `setting_sources=[]` and a string `system_prompt` derived from the SKILL.md body.
+- The runner is constructed with `lab_common.agent_runner.make_sdk_runner(spec, server, allowed_tools, model)`, where `server` and `allowed_tools` come from the skill's `agent_tools` module. The skill exposes four tools (`list_tickers`, `compute_correlation`, `get_returns_stats`, `run_sql`), so traces are naturally multi-step.
+- Scoring uses **DeepEval**: `GEval` for rubric/judge checks (configurable cross-family judge model: OpenAI/Gemini/Claude), `ToolCorrectnessMetric` for trajectory/tool-correctness checks, and a custom `BaseMetric` as a deterministic recompute oracle (Pearson within tolerance, no LLM).
+- Evals never depend on live ingested data; the fixtures parquet is injected via the `parquet` argument and `$PRICES_PARQUET`.
 - Output: per-case scores, mean compared to the frontmatter `threshold`, JSON report.
+- Wiring the eval gate into CI (M3) requires the `claude` CLI and Node in the runner environment in addition to the `ANTHROPIC_API_KEY` repo secret.
 
 ### CI pipeline (GitHub Actions, path-filtered per skill)
 
