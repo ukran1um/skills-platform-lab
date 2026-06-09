@@ -49,3 +49,44 @@ Lessons for talking about eval gates:
    scores. Use a capable judge for trustworthy gating; `--haiku` is for cheap agent iteration.
 4. median-of-N smooths RANDOM noise, not a SYSTEMATICALLY wrong judge — it did nothing for the
    0/0/0 case. Repetition is not a substitute for a well-scoped rubric.
+
+## 2026-06-09 — M2 rebuilt on the real runtime: Claude Agent SDK + DeepEval, multi-tool skill
+Rebuilt the eval harness to run the skill through the **Claude Agent SDK** (the same runtime
+the M5 host will use) and score with **DeepEval** — the bespoke Messages-API loop + hand-rolled
+scorers are gone. Why: evaluating a skill in a look-alike harness is apples-to-oranges; running
+it in the deployment substrate is apples-to-apples. The runner uses `setting_sources=[]` (loads
+no local ~/.claude) and a string `system_prompt` (replaces Claude Code's default), so the eval
+can't absorb laptop config — the same isolation a containerized CI would enforce.
+
+Substrate facts learned:
+- The Python `claude-agent-sdk` is a wrapper that spawns the `claude` CLI subprocess, so it needs
+  Node + the CLI present (not pure-Python). It DOES run headless on just an API key (passed via
+  `options.env`). M3 CI must install the CLI + Node in the runner.
+- The real runtime shows through: every run emits a harness-internal `ToolSearch` tool call
+  (deferred tool loading) before the skill's tools. We filter anything not prefixed `mcp__` and
+  strip the `mcp__factor__` prefix when building the trajectory for scoring.
+- Three DeepEval check types map cleanly: `GEval` = judge, `ToolCorrectnessMetric` = trajectory,
+  a custom `BaseMetric` = the deterministic recompute oracle.
+
+Live-run calibration findings (the headline lessons):
+1. **Cross-family judge, live.** With OPENAI_API_KEY in the env, the judge auto-selected
+   `openai:gpt-5.4` to grade Claude-haiku output — the whiteboard's "different family for review"
+   running for real. Generator and judge are independently configurable; nothing forces a weak
+   judge on strong output (the failure direction we hit earlier).
+2. **`exact_match` tool-correctness is too brittle for live agents.** The multi-step case had the
+   agent call `get_returns_stats` TWICE (it checked both candidates) — a correct answer, but
+   `exact_match=True` (expected exactly [compute_correlation, get_returns_stats]) FAILED it.
+   Relaxed to subset/recall (assert the two typed tools were composed). Lesson: "assert no extra
+   tools" and "tolerate reasonable agent variation" conflict; a gate must tolerate the variation
+   or it false-fails correct work. Forbidding a specific tool (run_sql) needs its own assertion,
+   not exact_match.
+3. **Verification-seeking recurs even with a STRONG judge.** GPT-5.4 docked the run_sql case to
+   0.5 because it "could not verify $121.39 is actually the highest close." Same failure mode as
+   the earlier Haiku judge on the 3-ticker case — the judge tried to verify a number it can't see.
+   Fix was again the RUBRIC ("judge only the format; do not verify the value; do not penalize
+   inability to verify"), not the model. Reinforces: rubric scoping is model-independent; even a
+   frontier judge defaults to verification-seeking unless explicitly told not to. Keep the judge
+   on what it can observe; let deterministic checks own correctness.
+
+After calibration: 4/4 cases, mean 1.000. Cost per run ≈ 4 Agent-SDK loops (CLI subprocess) +
+GEval judge calls — cents on Haiku agent + GPT judge.

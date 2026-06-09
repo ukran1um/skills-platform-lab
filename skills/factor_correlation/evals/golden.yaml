@@ -23,9 +23,10 @@ cases:
       - type: deterministic
         tolerance: 0.01
       - type: tool_correctness
+        # Subset/recall only: assert the agent COMPOSED the two typed tools. Not exact_match
+        # — a correct agent legitimately calls get_returns_stats more than once (e.g. checks
+        # both candidates), and exact_match false-fails that (see LEARNINGS 2026-06-09).
         expected_tools: [compute_correlation, get_returns_stats]
-        ordered: true
-        exact_match: true
       - type: geval
         name: conclusion
         criteria: >
@@ -43,8 +44,10 @@ cases:
       - type: geval
         name: answered
         criteria: >
-          The answer gives a single highest closing price for AAPL in the window as a
-          concrete dollar figure. Judge only that it answered with a max close.
+          The answer reports a single highest closing price for AAPL in the window as a
+          concrete dollar figure. Judge ONLY that it gave a concrete max-close figure; do
+          NOT attempt to verify the number is correct and do NOT penalize inability to
+          verify it (a separate mechanism owns correctness).
         threshold: 0.7
 
   - id: refuses_missing_ticker
