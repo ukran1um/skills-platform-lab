@@ -1,95 +1,53 @@
+import json
+from datetime import date
 from pathlib import Path
-from types import SimpleNamespace
 
+import pytest
 import yaml
 
 from lab_common.eval_harness import run_evals
+from lab_common.models import RunResult, ToolCall
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FACTOR_SKILL = REPO_ROOT / "skills" / "factor_correlation"
 
-TINY_GOLDEN = {
-    "cases": [
-        {
-            "id": "t1",
-            "input": "corr of AAPL and MSFT 2025-01-01..2025-06-30",
-            "checks": [
-                {"type": "trajectory", "must_call": ["compute_correlation"]},
-            ],
-        }
-    ]
-}
+
+def _good_runner(fixtures_parquet: Path):
+    from factor_correlation.cli import run as skill_run
+    truth = skill_run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)
+
+    def runner(_input: str) -> RunResult:
+        return RunResult(final_text="done", trajectory=[ToolCall(
+            "compute_correlation",
+            {"tickers": ["AAPL", "MSFT"], "start": "2025-01-01", "end": "2025-06-30"},
+            json.dumps(truth))])
+    return runner
 
 
-class FakeAgentClient:
-    """One scripted agent run: call compute_correlation, then finish."""
-
-    def __init__(self):
-        self.messages = self
-        self._step = 0
-
-    def create(self, **kwargs):
-        self._step += 1
-        if self._step == 1:
-            return SimpleNamespace(
-                stop_reason="tool_use",
-                content=[SimpleNamespace(
-                    type="tool_use", name="compute_correlation",
-                    input={"tickers": ["AAPL", "MSFT"], "start": "2025-01-01", "end": "2025-06-30"},
-                    id="tu1")],
-            )
-        return SimpleNamespace(
-            stop_reason="end_turn",
-            content=[SimpleNamespace(type="text", text="AAPL and MSFT daily-return correlation over the window was moderate.")],
-        )
+def test_offline_deterministic_and_tool_correctness(tmp_path: Path, fixtures_parquet: Path):
+    golden = {"cases": [{"id": "c1", "input": "x", "checks": [
+        {"type": "deterministic", "tolerance": 0.01},
+        {"type": "tool_correctness", "expected_tools": ["compute_correlation"], "exact_match": True},
+    ]}]}
+    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    report = run_evals(FACTOR_SKILL, runner=_good_runner(fixtures_parquet), judge=None,
+                       parquet=fixtures_parquet, golden_path=gp)
+    assert {c.type for c in report.cases[0].checks} == {"deterministic", "tool_correctness"}
+    assert report.cases[0].checks[0].passed and report.passed
 
 
-def test_run_evals_trajectory_only(tmp_path: Path, fixtures_parquet: Path):
-    golden = tmp_path / "golden.yaml"
-    golden.write_text(yaml.safe_dump(TINY_GOLDEN))
-    report = run_evals(
-        FACTOR_SKILL,
-        golden_path=golden,
-        agent_client=FakeAgentClient(),
-        judge_client=None,
-        context={"parquet": fixtures_parquet},
-    )
-    assert report.skill == "factor_correlation"
-    assert len(report.cases) == 1
-    assert report.cases[0].checks[0].type == "trajectory"
-    assert report.cases[0].checks[0].passed
-    assert report.mean_score == 1.0
-    assert report.passed
+def test_errored_case_scores_zero(tmp_path: Path, fixtures_parquet: Path):
+    def boom(_): raise RuntimeError("boom")
+    golden = {"cases": [{"id": "b", "input": "x",
+                         "checks": [{"type": "tool_correctness", "expected_tools": ["compute_correlation"]}]}]}
+    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    report = run_evals(FACTOR_SKILL, runner=boom, judge=None, parquet=fixtures_parquet, golden_path=gp)
+    assert report.cases[0].checks[0].type == "error" and not report.passed
 
 
-class RaisingAgentClient:
-    """Always blows up — simulates a case that errors mid-run."""
-
-    def __init__(self):
-        self.messages = self
-
-    def create(self, **kwargs):
-        raise RuntimeError("boom")
-
-
-def test_run_evals_errored_case_scores_zero_and_run_continues(tmp_path: Path, fixtures_parquet: Path):
-    two_cases = {
-        "cases": [
-            {"id": "boom", "input": "x", "checks": [{"type": "trajectory", "must_call": ["compute_correlation"]}]},
-            {"id": "ok", "input": "y", "checks": [{"type": "trajectory", "must_call": ["compute_correlation"]}]},
-        ]
-    }
-    golden = tmp_path / "golden.yaml"
-    golden.write_text(yaml.safe_dump(two_cases))
-    report = run_evals(
-        FACTOR_SKILL,
-        golden_path=golden,
-        agent_client=RaisingAgentClient(),  # every case errors
-        judge_client=None,
-        context={"parquet": fixtures_parquet},
-    )
-    # Both cases recorded (run did not abort); both scored 0 with an error check.
-    assert len(report.cases) == 2
-    assert all(c.score == 0.0 for c in report.cases)
-    assert report.cases[0].checks[0].type == "error"
-    assert not report.passed
+def test_geval_without_judge_raises(tmp_path: Path, fixtures_parquet: Path):
+    golden = {"cases": [{"id": "g", "input": "x", "checks": [{"type": "geval", "criteria": "good?"}]}]}
+    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    with pytest.raises(ValueError, match="no judge"):
+        run_evals(FACTOR_SKILL, runner=lambda s: RunResult("x", []), judge=None,
+                  parquet=fixtures_parquet, golden_path=gp)
