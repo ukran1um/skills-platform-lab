@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 
@@ -16,8 +18,12 @@ def correlation_matrix(prices: pd.DataFrame) -> pd.DataFrame:
     return daily_returns(prices).corr(method="pearson")
 
 
-def returns_stats(prices: pd.DataFrame) -> dict:
-    """Per-ticker daily-return stats from one ticker's price rows."""
+def returns_stats(prices: pd.DataFrame) -> dict[str, Any]:
+    """Per-ticker daily-return stats from one ticker's price rows.
+
+    daily_vol is the sample std (ddof=1) of daily returns. With a single return row
+    (n_days=1) std is NaN, which serializes to JSON null — acceptable for the lab.
+    """
     ticker = str(prices["ticker"].iloc[0])
     rets = prices.sort_values("date")["close"].pct_change(fill_method=None).dropna()
     return {

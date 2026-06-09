@@ -2,8 +2,9 @@
 
 Tools run IN this Python process and read the warehouse from $PRICES_PARQUET (the harness
 sets it). Sync `_*_impl` functions hold the logic and are unit-tested; the `@tool` async
-wrappers are thin shells returning MCP content. Errors are returned as {"error": ...} JSON
-so the agent can narrate a refusal rather than crashing the loop."""
+wrappers are thin shells returning MCP content. The impls catch broadly on purpose: a
+tool boundary must turn ANY failure (bad args, duckdb errors, missing data) into
+{"error": ...} JSON the agent can react to, never an exception that crashes the loop."""
 
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from factor_correlation.tools.fetch import get_prices, list_tickers, run_sql
 def _list_tickers_impl() -> str:
     try:
         return json.dumps({"tickers": list_tickers()})
-    except (ValueError, FileNotFoundError) as exc:
+    except Exception as exc:  # noqa: BLE001 — tool boundary: never crash the loop
         return json.dumps({"error": str(exc)})
 
 
@@ -30,7 +31,7 @@ def _compute_correlation_impl(args: dict[str, Any]) -> str:
     try:
         result = run(list(args["tickers"]), date.fromisoformat(args["start"]),
                      date.fromisoformat(args["end"]))
-    except (SystemExit, ValueError, FileNotFoundError) as exc:
+    except (SystemExit, Exception) as exc:  # noqa: BLE001 — tool boundary: never crash the loop
         return json.dumps({"error": str(exc)})
     return json.dumps(result)
 
@@ -42,7 +43,7 @@ def _returns_stats_impl(args: dict[str, Any]) -> str:
         if prices.empty:
             return json.dumps({"error": f"no data for {args['ticker']}"})
         return json.dumps(returns_stats(prices))
-    except (ValueError, FileNotFoundError) as exc:
+    except Exception as exc:  # noqa: BLE001 — tool boundary: never crash the loop
         return json.dumps({"error": str(exc)})
 
 
@@ -50,7 +51,7 @@ def _run_sql_impl(args: dict[str, Any]) -> str:
     try:
         df = run_sql(args["query"])
         return json.dumps({"rows": df.head(100).to_dict(orient="records")}, default=str)
-    except (ValueError, FileNotFoundError) as exc:
+    except Exception as exc:  # noqa: BLE001 — tool boundary: never crash the loop
         return json.dumps({"error": str(exc)})
 
 

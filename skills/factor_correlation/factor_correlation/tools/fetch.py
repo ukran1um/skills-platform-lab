@@ -11,7 +11,7 @@ import duckdb
 import pandas as pd
 
 _FORBIDDEN_SQL = re.compile(
-    r"\b(insert|update|delete|drop|alter|create|attach|detach|copy|pragma|export|install|load|set)\b",
+    r"\b(insert|update|delete|drop|alter|create|attach|detach|copy|pragma|export|install|load|set|call)\b",
     re.IGNORECASE,
 )
 
@@ -65,7 +65,7 @@ def run_sql(query: str, parquet: Path | None = None) -> pd.DataFrame:
     parquet = parquet or warehouse_path()
     if not parquet.exists():
         raise FileNotFoundError(f"warehouse parquet not found at {parquet}")
-    q = query.strip().rstrip(";").strip()
+    q = query.strip().rstrip(";").strip()  # strip one trailing ; (SQL convention), then reject any remaining
     if ";" in q:
         raise ValueError("only a single statement is allowed")
     if not re.match(r"(?is)^\s*(select|with)\b", q):
@@ -73,5 +73,6 @@ def run_sql(query: str, parquet: Path | None = None) -> pd.DataFrame:
     if _FORBIDDEN_SQL.search(q):
         raise ValueError("query contains a forbidden (non-read) keyword")
     con = duckdb.connect()
-    con.execute(f"CREATE VIEW prices AS SELECT * FROM read_parquet('{parquet}')")
+    # Bind `prices` via the relation API (path is a Python arg, never interpolated into SQL).
+    con.read_parquet(str(parquet)).create_view("prices")
     return con.execute(q).df()
