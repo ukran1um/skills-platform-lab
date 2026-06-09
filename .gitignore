@@ -9,3 +9,5 @@ data/warehouse/
 data/fixtures/
 .eval_fixtures/
 eval_report.json
+.env
+.env.*

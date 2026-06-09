@@ -148,8 +148,11 @@ def _report_to_dict(report: EvalReport) -> dict[str, Any]:
 
 def main() -> None:
     import anthropic
+    from dotenv import load_dotenv
 
     from lab_data.fixtures import write_parquet
+
+    load_dotenv()  # pick up ANTHROPIC_API_KEY from a project-root .env if present
 
     parser = argparse.ArgumentParser(description="Run a skill's golden-set evals (laptop mode).")
     parser.add_argument("skill_dir")
