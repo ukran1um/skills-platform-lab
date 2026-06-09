@@ -12,3 +12,11 @@ ingest to yfinance (Yahoo), which works headless with no API key and returns adj
 closes. Lesson: a "no-API-key public data source" is a standing liability — the resilient
 move is one batched download through a maintained library, plus deterministic synthetic
 fixtures (lab_data.fixtures) for tests/CI so the build never depends on a live scrape.
+
+## 2026-06-08 — M1 acceptance: project-level symlinked skills are discovered by Claude Code
+Verified in a fresh Claude Code session at the repo root: asking "how correlated were AAPL
+and MSFT daily returns in 2025?" caused Claude Code to discover and invoke the
+factor_correlation skill (exposed via .claude/skills/factor_correlation -> ../../skills/...)
+and run its CLI. The committed relative symlink works as the skill-wiring mechanism — no
+need for the fallback of a checked-in SKILL.md copy. This confirms the laptop-context path
+the promotion pipeline (M5) graduates skills out of.
