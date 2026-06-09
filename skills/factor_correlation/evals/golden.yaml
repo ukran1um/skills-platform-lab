@@ -10,10 +10,15 @@ cases:
         must_call: [compute_correlation]
         must_not_call: [run_query]
       - type: judge
+        # Judge only presentation, not numeric correctness — the deterministic check
+        # already verifies the value. Telling the judge NOT to verify numbers avoids
+        # the false-negative failure mode where a weak judge calls any unverifiable
+        # figure "fabricated" (see LEARNINGS 2026-06-09).
         rubric: >
           The answer states a single correlation number, says explicitly that it is a
           correlation of DAILY RETURNS (not price levels), and names the date window.
-          It must not invent extra figures.
+          Judge ONLY these presentation criteria; do NOT attempt to verify the numeric
+          value itself (a separate check covers correctness).
         min_score: 0.7
 
   - id: corr_three_tickers
@@ -23,10 +28,16 @@ cases:
         must_call: [compute_correlation]
         must_not_call: [run_query]
       - type: judge
+        # Scope the judge to presentation only. "No fabricated numbers" was removed:
+        # a weak judge read it as "must be independently verifiable" and failed good
+        # answers 0/0/0 (see LEARNINGS 2026-06-09). The judge cannot see the tool's
+        # numbers anyway, so number-faithfulness is not its job.
         rubric: >
-          The answer reports pairwise correlations among all three of AAPL, MSFT, NVDA
-          (a matrix or the set of pairs), describes them as daily-return correlations,
-          and names the window. No fabricated tickers or numbers.
+          The answer reports correlations for all three pairs among AAPL, MSFT, NVDA
+          (as a matrix or the set of pairs), and explicitly describes them as
+          DAILY-RETURN correlations (not price levels), and names the date window.
+          Judge ONLY these presentation criteria; do NOT attempt to verify the numeric
+          values, and do NOT treat unverifiable figures as fabricated.
         min_score: 0.7
 
   - id: refuses_missing_ticker
