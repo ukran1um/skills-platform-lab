@@ -1,95 +1,29 @@
-from types import SimpleNamespace
-
-from lab_common.agent_runner import run_skill
-from lab_common.models import SkillSpec
-
-SPEC = SkillSpec(
-    name="demo",
-    version="0.1.0",
-    owner="t",
-    blast_radius="low",
-    allowed_mcp_servers=[],
-    required_scopes=[],
-    golden_set="",
-    threshold=0.0,
-    system_prompt="You are a demo agent.",
-)
-
-TOOLS = [{"name": "echo", "description": "echo", "input_schema": {"type": "object", "properties": {}}}]
+from lab_common.agent_runner import build_runresult
 
 
-def _block(type_, **kw):
-    return SimpleNamespace(type=type_, **kw)
-
-
-class FakeClient:
-    """Yields a scripted sequence of responses, one per create() call."""
-
-    def __init__(self, responses):
-        self._responses = list(responses)
-        self.calls = []
-        self.messages = self  # so client.messages.create works
-
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
-        return self._responses.pop(0)
-
-
-def _dispatch(name, inputs, context):
-    return '{"echoed": true}'
-
-
-def test_runner_captures_tool_call_and_final_text():
-    responses = [
-        SimpleNamespace(
-            stop_reason="tool_use",
-            content=[_block("tool_use", name="echo", input={"x": 1}, id="tu_1")],
-        ),
-        SimpleNamespace(
-            stop_reason="end_turn",
-            content=[_block("text", text="all done")],
-        ),
+def test_build_runresult_filters_harness_tools_and_strips_prefix():
+    tool_uses = [
+        ("id0", "ToolSearch", {"query": "select:..."}),
+        ("id1", "mcp__factor__compute_correlation", {"tickers": ["AAPL", "MSFT"]}),
     ]
-    client = FakeClient(responses)
-    result = run_skill(SPEC, "do it", TOOLS, _dispatch, client=client, context={"parquet": None})
-    assert result.final_text == "all done"
-    assert result.called_tools() == ["echo"]
-    assert result.trajectory[0].input == {"x": 1}
-    assert result.trajectory[0].result == '{"echoed": true}'
-    assert client.calls[0]["system"] == "You are a demo agent."
-    assert client.calls[1]["messages"][-1]["content"][0]["type"] == "tool_result"
+    tool_results = {"id0": "[ref]", "id1": '{"correlation_value": -0.05}'}
+    run = build_runresult(tool_uses, tool_results, final_text="the answer")
+    assert run.called_tools() == ["compute_correlation"]
+    assert run.trajectory[0].input == {"tickers": ["AAPL", "MSFT"]}
+    assert run.trajectory[0].result == '{"correlation_value": -0.05}'
+    assert run.final_text == "the answer"
 
 
-def test_runner_respects_max_turns():
-    looping = [
-        SimpleNamespace(
-            stop_reason="tool_use",
-            content=[_block("tool_use", name="echo", input={}, id=f"tu_{i}")],
-        )
-        for i in range(10)
-    ]
-    client = FakeClient(looping)
-    result = run_skill(
-        SPEC, "loop", TOOLS, _dispatch, client=client, context={}, max_turns=3
-    )
-    assert len(client.calls) == 3  # stopped at the cap
-    assert len(result.trajectory) == 3
+def test_build_runresult_handles_missing_result():
+    run = build_runresult([("id1", "mcp__factor__list_tickers", {})], {}, final_text=None)
+    assert run.called_tools() == ["list_tickers"]
+    assert run.trajectory[0].result is None
+    assert run.final_text is None
 
 
-def test_final_text_not_carried_over_from_mid_loop():
-    # Mid-loop narration must NOT survive as the answer when the terminal turn
-    # has no text block — the judge would otherwise score a reasoning fragment.
-    responses = [
-        SimpleNamespace(
-            stop_reason="tool_use",
-            content=[_block("text", text="let me check"),
-                     _block("tool_use", name="echo", input={}, id="t1")],
-        ),
-        SimpleNamespace(
-            stop_reason="end_turn",
-            content=[_block("tool_use", name="echo", input={}, id="t2")],  # no text
-        ),
-    ]
-    client = FakeClient(responses)
-    result = run_skill(SPEC, "x", TOOLS, _dispatch, client=client)
-    assert result.final_text is None  # not "let me check"
+def test_build_runresult_extracts_text_from_list_content():
+    # tool_results values may be a list of content blocks (SDK shape) or a plain string.
+    tool_uses = [("id1", "mcp__factor__run_sql", {"query": "SELECT 1"})]
+    tool_results = {"id1": [{"type": "text", "text": '{"rows": []}'}]}
+    run = build_runresult(tool_uses, tool_results, final_text="x")
+    assert run.trajectory[0].result == '{"rows": []}'
