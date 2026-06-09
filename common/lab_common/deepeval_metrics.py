@@ -10,12 +10,35 @@ from typing import Any
 
 import pandas as pd
 from deepeval.metrics import BaseMetric, GEval, ToolCorrectnessMetric
+from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from deepeval.test_case import ToolCall as DEToolCall
 
 from lab_common.models import RunResult
 
 DEFAULT_ANTHROPIC_JUDGE = "claude-sonnet-4-6"
+
+
+class _NoModel(DeepEvalBaseLLM):
+    """Placeholder LLM for deterministic metrics that don't use one.
+
+    deepeval's built-in metrics call initialize_model(None), which defaults to
+    GPTModel() and raises if OPENAI_API_KEY is unset — even for ToolCorrectnessMetric,
+    which never calls an LLM. Passing this keeps construction keyless (the offline gate
+    has no API keys). It is never invoked; generate() raising is the safety net.
+    """
+
+    def load_model(self):
+        return None
+
+    def generate(self, *args: Any, **kwargs: Any) -> str:
+        raise NotImplementedError("_NoModel is for metrics that do not use an LLM")
+
+    async def a_generate(self, *args: Any, **kwargs: Any) -> str:
+        raise NotImplementedError("_NoModel is for metrics that do not use an LLM")
+
+    def get_model_name(self) -> str:
+        return "none"
 
 
 def choose_judge_provider(env: dict[str, str]) -> str:
@@ -126,6 +149,7 @@ def build_metric(check: dict[str, Any], *, judge: Any, parquet: Path):
             threshold=check.get("threshold", 1.0),
             should_consider_ordering=check.get("ordered", False),
             should_exact_match=check.get("exact_match", False),
+            model=_NoModel(),  # deterministic metric — avoid the GPT default + key demand
         ), "tool_correctness"
     if t == "geval":
         return GEval(
