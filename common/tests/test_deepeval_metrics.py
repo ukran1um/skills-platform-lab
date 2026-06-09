@@ -39,3 +39,13 @@ def test_deterministic_fails_on_wrong_matrix(fixtures_parquet: Path):
     m = DeterministicCorrelationMetric(parquet=fixtures_parquet, tolerance=0.01)
     m.measure(_tc(bad))
     assert not m.is_successful()
+
+
+def test_deterministic_fails_cleanly_on_error_output(fixtures_parquet: Path):
+    # A compute_correlation call that returned {"error":...} must yield a clean FAIL
+    # with a diagnostic reason — not an uncaught KeyError.
+    m = DeterministicCorrelationMetric(parquet=fixtures_parquet, tolerance=0.01)
+    m.measure(_tc({"error": "ticker(s) not found: ZZZTOP"}))
+    assert not m.is_successful()
+    reason = m.reason or ""
+    assert "no matrix" in reason and "ZZZTOP" in reason

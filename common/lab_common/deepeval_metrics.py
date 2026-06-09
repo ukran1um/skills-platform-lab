@@ -73,7 +73,16 @@ class DeterministicCorrelationMetric(BaseMetric):
         bad = []
         for call in calls:
             output: str = call.output or ""
-            reported = json.loads(output)["matrix"]
+            try:
+                parsed = json.loads(output)
+            except json.JSONDecodeError:
+                bad.append(f"unparseable tool output: {output[:80]!r}")
+                continue
+            if "matrix" not in parsed:
+                # e.g. the tool returned {"error": ...} (missing ticker, bad range)
+                bad.append(f"tool returned no matrix: {parsed.get('error', output[:80])}")
+                continue
+            reported = parsed["matrix"]
             params: dict[str, Any] = call.input_parameters or {}
             expected = _recompute_matrix(self.parquet, params["tickers"],
                                          params["start"], params["end"])

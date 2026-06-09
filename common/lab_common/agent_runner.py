@@ -94,7 +94,11 @@ async def run_skill(
 def make_sdk_runner(
     spec: SkillSpec, server: Any, allowed_tools: list[str], model: str = DEFAULT_MODEL
 ) -> Callable[[str], RunResult]:
-    """A sync runner(input)->RunResult that runs the async SDK query per call."""
+    """A sync runner(input)->RunResult that runs the async SDK query per call.
+
+    NOTE: uses asyncio.run, so it is NOT safe to call from within a running event loop
+    (e.g. an async M5 host) — call the async `run_skill` directly there instead.
+    """
     def runner(user_input: str) -> RunResult:
         return asyncio.run(run_skill(spec, user_input, server=server,
                                      allowed_tools=allowed_tools, model=model))
