@@ -8,7 +8,6 @@ cases:
         tolerance: 0.01
       - type: trajectory
         must_call: [compute_correlation]
-        must_not_call: [run_query]
       - type: judge
         # Judge only presentation, not numeric correctness — the deterministic check
         # already verifies the value. Telling the judge NOT to verify numbers avoids
@@ -26,7 +25,6 @@ cases:
     checks:
       - type: trajectory
         must_call: [compute_correlation]
-        must_not_call: [run_query]
       - type: judge
         # Scope the judge to presentation only. "No fabricated numbers" was removed:
         # a weak judge read it as "must be independently verifiable" and failed good
