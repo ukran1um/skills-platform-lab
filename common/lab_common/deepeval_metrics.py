@@ -32,15 +32,15 @@ def make_judge(provider: str | None = None, env: dict[str, str] | None = None):
     provider = provider or choose_judge_provider(env)
     if provider == "openai":
         from deepeval.models import GPTModel
-        m = GPTModel()
-        return m, f"openai:{m.get_model_name()}"
+        judge: Any = GPTModel()
+        return judge, f"openai:{judge.get_model_name()}"
     if provider == "gemini":
         from deepeval.models import GeminiModel
-        m = GeminiModel()
-        return m, f"gemini:{m.get_model_name()}"
+        judge = GeminiModel()
+        return judge, f"gemini:{judge.get_model_name()}"
     from deepeval.models import AnthropicModel
-    m = AnthropicModel(model=DEFAULT_ANTHROPIC_JUDGE, api_key=env["ANTHROPIC_API_KEY"])
-    return m, f"anthropic:{DEFAULT_ANTHROPIC_JUDGE}"
+    judge = AnthropicModel(model=DEFAULT_ANTHROPIC_JUDGE, api_key=env["ANTHROPIC_API_KEY"])
+    return judge, f"anthropic:{DEFAULT_ANTHROPIC_JUDGE}"
 
 
 def _recompute_matrix(parquet: Path, tickers: list[str], start: str, end: str) -> dict:
@@ -72,9 +72,11 @@ class DeterministicCorrelationMetric(BaseMetric):
             return self.score
         bad = []
         for call in calls:
-            reported = json.loads(call.output)["matrix"]
-            expected = _recompute_matrix(self.parquet, call.input_parameters["tickers"],
-                                         call.input_parameters["start"], call.input_parameters["end"])
+            output: str = call.output or ""
+            reported = json.loads(output)["matrix"]
+            params: dict[str, Any] = call.input_parameters or {}
+            expected = _recompute_matrix(self.parquet, params["tickers"],
+                                         params["start"], params["end"])
             for a in expected:
                 for b in expected:
                     if abs(reported[a][b] - expected[a][b]) > self.tolerance:
@@ -101,7 +103,7 @@ def to_test_case(input_text: str, run: RunResult, expected_tools: list[str] | No
         actual_output=run.final_text or "",
         tools_called=[DEToolCall(name=c.name, input_parameters=c.input, output=c.result)
                       for c in run.trajectory],
-        expected_tools=[DEToolCall(name=n) for n in (expected_tools or [])],
+        expected_tools=[DEToolCall(name=n) for n in (expected_tools or [])],  # type: ignore[call-arg]
     )
 
 

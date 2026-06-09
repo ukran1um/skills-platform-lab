@@ -25,7 +25,7 @@ def test_live_eval_runs_and_scores(fixtures_parquet: Path):
     from lab_common.eval_harness import run_evals
 
     client = anthropic.Anthropic()
-    report = run_evals(
+    report = run_evals(  # type: ignore[call-arg]
         FACTOR_SKILL,
         agent_client=client,
         judge_client=client,

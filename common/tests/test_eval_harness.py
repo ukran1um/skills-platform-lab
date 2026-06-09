@@ -29,7 +29,8 @@ def test_offline_deterministic_and_tool_correctness(tmp_path: Path, fixtures_par
         {"type": "deterministic", "tolerance": 0.01},
         {"type": "tool_correctness", "expected_tools": ["compute_correlation"], "exact_match": True},
     ]}]}
-    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    gp = tmp_path / "g.yaml"
+    gp.write_text(yaml.safe_dump(golden))
     report = run_evals(FACTOR_SKILL, runner=_good_runner(fixtures_parquet), judge=None,
                        parquet=fixtures_parquet, golden_path=gp)
     assert {c.type for c in report.cases[0].checks} == {"deterministic", "tool_correctness"}
@@ -40,14 +41,16 @@ def test_errored_case_scores_zero(tmp_path: Path, fixtures_parquet: Path):
     def boom(_): raise RuntimeError("boom")
     golden = {"cases": [{"id": "b", "input": "x",
                          "checks": [{"type": "tool_correctness", "expected_tools": ["compute_correlation"]}]}]}
-    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    gp = tmp_path / "g.yaml"
+    gp.write_text(yaml.safe_dump(golden))
     report = run_evals(FACTOR_SKILL, runner=boom, judge=None, parquet=fixtures_parquet, golden_path=gp)
     assert report.cases[0].checks[0].type == "error" and not report.passed
 
 
 def test_geval_without_judge_raises(tmp_path: Path, fixtures_parquet: Path):
     golden = {"cases": [{"id": "g", "input": "x", "checks": [{"type": "geval", "criteria": "good?"}]}]}
-    gp = tmp_path / "g.yaml"; gp.write_text(yaml.safe_dump(golden))
+    gp = tmp_path / "g.yaml"
+    gp.write_text(yaml.safe_dump(golden))
     with pytest.raises(ValueError, match="no judge"):
         run_evals(FACTOR_SKILL, runner=lambda s: RunResult("x", []), judge=None,
                   parquet=fixtures_parquet, golden_path=gp)
