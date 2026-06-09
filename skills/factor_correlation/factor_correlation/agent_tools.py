@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from pathlib import Path as _Path
 from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
@@ -93,3 +94,48 @@ ALLOWED_TOOLS = [
     "mcp__factor__get_returns_stats",
     "mcp__factor__run_sql",
 ]
+
+# ---------------------------------------------------------------------------
+# Backward-compat shim for eval_harness (pre-SDK runner) — will be removed
+# when the harness is updated to use the Agent-SDK surface (Task 3).
+# ---------------------------------------------------------------------------
+TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "compute_correlation",
+        "description": (
+            "Compute the Pearson correlation of daily returns between two or more "
+            "tickers over a date range. Returns a correlation matrix, and for exactly "
+            "two tickers a top-level correlation_value."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tickers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Ticker symbols, e.g. ['AAPL', 'MSFT']",
+                },
+                "start": {"type": "string", "description": "Start date ISO YYYY-MM-DD"},
+                "end": {"type": "string", "description": "End date ISO YYYY-MM-DD"},
+            },
+            "required": ["tickers", "start", "end"],
+        },
+    }
+]
+
+
+def dispatch(name: str, inputs: dict[str, Any], context: dict[str, Any]) -> str:
+    parquet = context.get("parquet")
+    parquet = _Path(parquet) if parquet else None
+    if name == "compute_correlation":
+        try:
+            result = run(
+                list(inputs["tickers"]),
+                date.fromisoformat(inputs["start"]),
+                date.fromisoformat(inputs["end"]),
+                parquet=parquet,
+            )
+        except (SystemExit, ValueError, FileNotFoundError) as exc:
+            return json.dumps({"error": str(exc)})
+        return json.dumps(result)
+    return json.dumps({"error": f"unknown tool: {name}"})
