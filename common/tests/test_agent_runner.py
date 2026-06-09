@@ -74,3 +74,22 @@ def test_runner_respects_max_turns():
     )
     assert len(client.calls) == 3  # stopped at the cap
     assert len(result.trajectory) == 3
+
+
+def test_final_text_not_carried_over_from_mid_loop():
+    # Mid-loop narration must NOT survive as the answer when the terminal turn
+    # has no text block — the judge would otherwise score a reasoning fragment.
+    responses = [
+        SimpleNamespace(
+            stop_reason="tool_use",
+            content=[_block("text", text="let me check"),
+                     _block("tool_use", name="echo", input={}, id="t1")],
+        ),
+        SimpleNamespace(
+            stop_reason="end_turn",
+            content=[_block("tool_use", name="echo", input={}, id="t2")],  # no text
+        ),
+    ]
+    client = FakeClient(responses)
+    result = run_skill(SPEC, "x", TOOLS, _dispatch, client=client)
+    assert result.final_text is None  # not "let me check"

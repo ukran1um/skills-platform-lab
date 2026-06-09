@@ -44,10 +44,12 @@ def run_skill(
         )
         tool_uses = [b for b in response.content if b.type == "tool_use"]
         texts = [b for b in response.content if b.type == "text"]
-        if texts:
-            final_text = texts[-1].text
+        turn_text = texts[-1].text if texts else None
 
         if response.stop_reason != "tool_use" or not tool_uses:
+            # Only the terminal turn's text is the agent's answer; never carry
+            # forward mid-loop narration (it would be judged as the answer).
+            final_text = turn_text
             break
 
         tool_results = []

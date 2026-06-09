@@ -76,6 +76,29 @@ def test_judge_takes_median_of_runs():
     assert res.passed
 
 
+def test_deterministic_rejects_non_pair_call(fixtures_parquet: Path):
+    import pytest
+
+    run = RunResult(
+        final_text="...",
+        trajectory=[
+            ToolCall(
+                "compute_correlation",
+                {"tickers": ["AAPL", "MSFT", "NVDA"], "start": "2025-01-01", "end": "2025-06-30"},
+                json.dumps({"correlation_value": 0.5}),
+            )
+        ],
+    )
+    # The independent oracle is 2-ticker-only; a 3-ticker deterministic check is a
+    # misconfiguration and must fail loudly rather than silently score a wrong pair.
+    with pytest.raises(ValueError, match="exactly 2 tickers"):
+        score_deterministic(
+            run,
+            {"tool": "compute_correlation", "field": "correlation_value", "tolerance": 0.01},
+            context={"parquet": fixtures_parquet},
+        )
+
+
 def _d(s: str):
     from datetime import date
     return date.fromisoformat(s)

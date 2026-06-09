@@ -40,6 +40,10 @@ def _find_call(run: RunResult, tool: str):
 
 
 def _independent_pearson(parquet: Path, tickers: list[str], start: str, end: str) -> float:
+    if len(tickers) != 2:
+        raise ValueError(
+            f"deterministic recompute requires exactly 2 tickers, got {tickers!r}"
+        )
     df = pd.read_parquet(parquet)
     df["date"] = pd.to_datetime(df["date"]).dt.date
     mask = (
