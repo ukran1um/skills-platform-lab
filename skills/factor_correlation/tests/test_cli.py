@@ -5,47 +5,35 @@ from pathlib import Path
 import pytest
 
 from factor_correlation.cli import run
-from lab_data.fixtures import write_parquet
 
 
-@pytest.fixture()
-def warehouse_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = write_parquet(tmp_path / "prices.parquet")
-    monkeypatch.setenv("PRICES_PARQUET", str(path))
-    return path
-
-
-def test_run_accepts_parquet_kwarg_without_env(tmp_path: Path):
-    # The M2 harness seam: point run() at a fixtures warehouse via the kwarg,
-    # with no $PRICES_PARQUET set.
-    path = write_parquet(tmp_path / "prices.parquet")
-    result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30), parquet=path)
+def test_run_accepts_parquet_kwarg(fixtures_parquet: Path):
+    result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)
     assert result["tickers"] == ["AAPL", "MSFT"]
     assert "correlation_value" in result
 
 
-def test_run_two_tickers_has_correlation_value(warehouse_env: Path):
-    result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30))
+def test_run_two_tickers_has_correlation_value(fixtures_parquet: Path):
+    result = run(["AAPL", "MSFT"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)
     assert result["tickers"] == ["AAPL", "MSFT"]
     assert "correlation_value" in result
     assert -1.0 <= result["correlation_value"] <= 1.0
     assert result["matrix"]["AAPL"]["MSFT"] == result["correlation_value"]
-    json.dumps(result)  # must be JSON-serializable
+    json.dumps(result)  # JSON-serializable
 
 
-def test_run_three_tickers_matrix_only(warehouse_env: Path):
-    result = run(["AAPL", "MSFT", "NVDA"], date(2025, 1, 1), date(2025, 6, 30))
+def test_run_three_tickers_matrix_only(fixtures_parquet: Path):
+    result = run(["AAPL", "MSFT", "NVDA"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)
     assert "correlation_value" not in result
     assert set(result["matrix"].keys()) == {"AAPL", "MSFT", "NVDA"}
     assert result["matrix"]["AAPL"]["AAPL"] == pytest.approx(1.0)
 
 
-def test_run_unknown_ticker_exits(warehouse_env: Path):
+def test_run_unknown_ticker_exits(fixtures_parquet: Path):
     with pytest.raises(SystemExit, match="no price data"):
-        run(["ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30))
+        run(["ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)
 
 
-def test_run_partial_unknown_exits(warehouse_env: Path):
-    # Some tickers present, some absent: must fail loudly, naming the missing one.
+def test_run_partial_unknown_exits(fixtures_parquet: Path):
     with pytest.raises(SystemExit, match="ZZZTOP"):
-        run(["AAPL", "ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30))
+        run(["AAPL", "ZZZTOP"], date(2025, 1, 1), date(2025, 6, 30), parquet=fixtures_parquet)

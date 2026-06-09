@@ -22,3 +22,7 @@ target-version = "py312"
 python_version = "3.12"
 ignore_missing_imports = true
 exclude = ["\\.venv"]
+
+[tool.pytest.ini_options]
+# Anchor rootdir at the repo root so the workspace-wide conftest.py is always loaded.
+addopts = []
