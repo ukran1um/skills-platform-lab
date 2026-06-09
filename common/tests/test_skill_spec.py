@@ -53,3 +53,30 @@ def test_missing_frontmatter_raises(tmp_path: Path):
     (skill_dir / "SKILL.md").write_text("no frontmatter here")
     with pytest.raises(ValueError, match="frontmatter"):
         load_skill(skill_dir)
+
+
+def test_inline_dashes_in_value_not_truncated(tmp_path: Path):
+    # A '---' inside a YAML value must not be treated as a fence boundary.
+    skill_dir = tmp_path / "dashes"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: dash\n"
+        "version: 0.1.0\n"
+        "description: compute foo --- bar baz\n"
+        "---\n\n"
+        "# Body\n"
+        "Some text with a --- horizontal rule.\n"
+    )
+    spec = load_skill(skill_dir)
+    assert spec.name == "dash"
+    assert "# Body" in spec.system_prompt
+    assert "horizontal rule" in spec.system_prompt
+
+
+def test_missing_required_key_raises_clear_error(tmp_path: Path):
+    skill_dir = tmp_path / "noname"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("---\nversion: 0.1.0\n---\n\n# Body\n")
+    with pytest.raises(ValueError, match="required frontmatter field 'name'"):
+        load_skill(skill_dir)

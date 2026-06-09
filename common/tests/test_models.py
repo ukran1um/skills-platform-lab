@@ -29,6 +29,7 @@ def test_runresult_holds_trajectory():
     run = RunResult(final_text="done", trajectory=[call])
     assert run.trajectory[0].name == "t"
     assert run.final_text == "done"
+    assert run.called_tools() == ["t"]
 
 
 def test_report_aggregates_case_scores():
