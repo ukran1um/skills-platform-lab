@@ -11,3 +11,5 @@ data/fixtures/
 eval_report.json
 .env
 .env.*
+.deepeval/
+.deepeval-cache.json
