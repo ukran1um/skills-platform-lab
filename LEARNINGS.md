@@ -90,3 +90,19 @@ Live-run calibration findings (the headline lessons):
 
 After calibration: 4/4 cases, mean 1.000. Cost per run ≈ 4 Agent-SDK loops (CLI subprocess) +
 GEval judge calls — cents on Haiku agent + GPT judge.
+
+## 2026-06-09 — the keyless CI gate caught a hidden dependency the local run masked
+First CI run of the DeepEval harness FAILED on an offline test that passed locally. Cause:
+`ToolCorrectnessMetric()` (a deterministic, no-LLM metric) calls deepeval's
+`initialize_model(None)`, which DEFAULTS to `GPTModel()` and raises if `OPENAI_API_KEY` is
+unset — at construction, before any scoring. It passed on my laptop only because my shell
+has OPENAI_API_KEY (the same key that made the judge auto-pick gpt-5.4). CI's free gate is
+keyless, so construction blew up. Fix: pass a no-op `_NoModel(DeepEvalBaseLLM)` so the metric
+never defaults to GPT. Reproduced locally by unsetting the keys (`env -u OPENAI_API_KEY ...`).
+
+This is the containerization/parity lesson in miniature: a dependency that "works on my
+laptop" because of ambient env state (an exported API key) silently breaks in a clean
+environment. The keyless CI gate is the cheap proxy for the hermetic container — it fails
+fast on exactly the leak that would otherwise surface only after deploy. Lesson: run the gate
+in the cleanest environment you can (no ambient keys, no local config) so local convenience
+state can't mask a real dependency.
