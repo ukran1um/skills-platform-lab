@@ -41,3 +41,13 @@ def test_inversely_correlated_pair():
     prices = pd.concat([_prices("AAA", a), _prices("CCC", c)], ignore_index=True)
     corr = correlation_matrix(prices)
     assert corr.loc["AAA", "CCC"] == pytest.approx(-1.0, abs=1e-3)
+
+
+def test_returns_stats():
+    from factor_correlation.tools.compute import returns_stats
+    prices = _prices("AAA", _closes_from_returns(100.0, [0.10, -0.05, 0.08]))
+    stats = returns_stats(prices)
+    assert stats["ticker"] == "AAA"
+    assert stats["n_days"] == 3
+    assert stats["mean_daily_return"] == pytest.approx((0.10 - 0.05 + 0.08) / 3, abs=1e-6)
+    assert stats["daily_vol"] > 0

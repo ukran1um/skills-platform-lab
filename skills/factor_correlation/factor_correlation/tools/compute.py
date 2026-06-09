@@ -14,3 +14,15 @@ def daily_returns(prices: pd.DataFrame) -> pd.DataFrame:
 def correlation_matrix(prices: pd.DataFrame) -> pd.DataFrame:
     """Pearson correlation of daily returns, pairwise over shared dates."""
     return daily_returns(prices).corr(method="pearson")
+
+
+def returns_stats(prices: pd.DataFrame) -> dict:
+    """Per-ticker daily-return stats from one ticker's price rows."""
+    ticker = str(prices["ticker"].iloc[0])
+    rets = prices.sort_values("date")["close"].pct_change(fill_method=None).dropna()
+    return {
+        "ticker": ticker,
+        "n_days": int(len(rets)),
+        "mean_daily_return": float(rets.mean()),
+        "daily_vol": float(rets.std()),
+    }
