@@ -47,8 +47,13 @@ def test_errored_case_scores_zero(tmp_path: Path, fixtures_parquet: Path):
     assert report.cases[0].checks[0].type == "error" and not report.passed
 
 
-def test_geval_without_judge_raises(tmp_path: Path, fixtures_parquet: Path):
-    golden = {"cases": [{"id": "g", "input": "x", "checks": [{"type": "geval", "criteria": "good?"}]}]}
+@pytest.mark.parametrize("check", [
+    {"type": "geval", "criteria": "good?"},
+    {"type": "answer_relevancy"},
+    {"type": "task_completion"},
+])
+def test_judge_backed_check_without_judge_raises(check, tmp_path: Path, fixtures_parquet: Path):
+    golden = {"cases": [{"id": "g", "input": "x", "checks": [check]}]}
     gp = tmp_path / "g.yaml"
     gp.write_text(yaml.safe_dump(golden))
     with pytest.raises(ValueError, match="no judge"):

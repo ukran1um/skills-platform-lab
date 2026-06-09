@@ -3,7 +3,20 @@ from pathlib import Path
 
 from deepeval.test_case import LLMTestCase, ToolCall
 
-from lab_common.deepeval_metrics import DeterministicCorrelationMetric, choose_judge_provider
+from lab_common.deepeval_metrics import (
+    DeterministicCorrelationMetric,
+    _NoModel,
+    build_metric,
+    choose_judge_provider,
+)
+
+
+def test_build_metric_routes_judge_backed_types(tmp_path: Path):
+    # Routing only — construct with a no-op judge so no key/LLM call is needed.
+    ar, label_ar = build_metric({"type": "answer_relevancy"}, judge=_NoModel(), parquet=tmp_path)
+    assert label_ar == "answer_relevancy" and type(ar).__name__ == "AnswerRelevancyMetric"
+    tc, label_tc = build_metric({"type": "task_completion"}, judge=_NoModel(), parquet=tmp_path)
+    assert label_tc == "task_completion" and type(tc).__name__ == "TaskCompletionMetric"
 
 
 def test_chooser_prefers_openai():

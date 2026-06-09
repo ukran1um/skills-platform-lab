@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from deepeval.metrics import BaseMetric, GEval, ToolCorrectnessMetric
+from deepeval.metrics import (
+    AnswerRelevancyMetric,
+    BaseMetric,
+    GEval,
+    TaskCompletionMetric,
+    ToolCorrectnessMetric,
+)
 from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 from deepeval.test_case import ToolCall as DEToolCall
@@ -17,6 +23,9 @@ from deepeval.test_case import ToolCall as DEToolCall
 from lab_common.models import RunResult
 
 DEFAULT_ANTHROPIC_JUDGE = "claude-sonnet-4-6"
+
+# Check types that score with the judge LLM — run_evals requires a judge if any are present.
+JUDGE_BACKED_CHECKS = {"geval", "answer_relevancy", "task_completion"}
 
 
 class _NoModel(DeepEvalBaseLLM):
@@ -157,4 +166,10 @@ def build_metric(check: dict[str, Any], *, judge: Any, parquet: Path):
             evaluation_params=[LLMTestCaseParams.INPUT, LLMTestCaseParams.ACTUAL_OUTPUT],
             model=judge, threshold=check.get("threshold", 0.7),
         ), "geval"
+    if t == "answer_relevancy":
+        # Packaged DeepEval metric: is the answer on-topic for the question? Needs the judge.
+        return AnswerRelevancyMetric(threshold=check.get("threshold", 0.7), model=judge), "answer_relevancy"
+    if t == "task_completion":
+        # Packaged agentic metric: did the run accomplish the task (judged from the trace)? Needs the judge.
+        return TaskCompletionMetric(threshold=check.get("threshold", 0.7), model=judge), "task_completion"
     raise ValueError(f"unknown check type: {t}")

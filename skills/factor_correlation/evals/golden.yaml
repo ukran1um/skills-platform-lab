@@ -14,6 +14,8 @@ cases:
           DAILY RETURNS (not price levels), and names the date window. Judge presentation
           only; do NOT verify the numeric value or treat unverifiable figures as fabricated.
         threshold: 0.7
+      - type: answer_relevancy    # packaged DeepEval metric: is the answer on-topic for the question?
+        threshold: 0.7
 
   - id: winner_and_volatility
     input: >
@@ -33,6 +35,8 @@ cases:
           The answer identifies NVDA (not MSFT) as more correlated with AAPL, and reports
           NVDA's daily-return volatility over the window, described as daily-return based.
           Judge the stated conclusion and completeness only.
+        threshold: 0.7
+      - type: task_completion     # packaged agentic metric: did the run accomplish the 2-part task?
         threshold: 0.7
 
   - id: flexible_query_uses_sql

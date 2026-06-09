@@ -16,7 +16,12 @@ from typing import Any, Callable
 
 import yaml
 
-from lab_common.deepeval_metrics import build_metric, make_judge, to_test_case
+from lab_common.deepeval_metrics import (
+    JUDGE_BACKED_CHECKS,
+    build_metric,
+    make_judge,
+    to_test_case,
+)
 from lab_common.models import CaseResult, CheckResult, EvalReport, RunResult
 from lab_common.skill_spec import load_skill
 
@@ -54,8 +59,10 @@ def run_evals(
 ) -> EvalReport:
     spec = load_skill(skill_dir)
     cases = load_golden(golden_path or (Path(skill_dir) / spec.golden_set))
-    if any(c["type"] == "geval" for case in cases for c in case["checks"]) and judge is None:
-        raise ValueError("golden set has geval checks but no judge model")
+    if judge is None and any(
+        c["type"] in JUDGE_BACKED_CHECKS for case in cases for c in case["checks"]
+    ):
+        raise ValueError("golden set has judge-backed checks but no judge model")
     case_results: list[CaseResult] = []
     for case in cases:
         try:
