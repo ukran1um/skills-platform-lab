@@ -38,7 +38,14 @@ def _load_agent_tools(spec: SkillSpec):
     return module.TOOLS, module.dispatch
 
 
-def _score_case(case: dict[str, Any], run: Any, *, judge_client: Any, context: dict[str, Any]) -> CaseResult:
+def _score_case(
+    case: dict[str, Any],
+    run: Any,
+    *,
+    judge_client: Any,
+    judge_model: str,
+    context: dict[str, Any],
+) -> CaseResult:
     results: list[CheckResult] = []
     for check in case["checks"]:
         ctype = check["type"]
@@ -47,7 +54,9 @@ def _score_case(case: dict[str, Any], run: Any, *, judge_client: Any, context: d
         elif ctype == "deterministic":
             results.append(score_deterministic(run, check, context=context))
         elif ctype == "judge":
-            results.append(score_judge(run.final_text, check, client=judge_client))
+            results.append(
+                score_judge(run.final_text, check, client=judge_client, judge_model=judge_model)
+            )
         else:
             results.append(CheckResult(ctype, False, 0.0, f"unknown check type {ctype}"))
     case_score = statistics.mean(r.score for r in results) if results else 0.0
@@ -62,6 +71,7 @@ def run_evals(
     judge_client: Any,
     context: dict[str, Any],
     model: str = "claude-sonnet-4-6",
+    judge_model: str = "claude-sonnet-4-6",
 ) -> EvalReport:
     spec = load_skill(skill_dir)
     golden_path = golden_path or (Path(skill_dir) / spec.golden_set)
@@ -81,7 +91,11 @@ def run_evals(
                 spec, case["input"], tools, dispatch,
                 client=agent_client, context=context, model=model,
             )
-            case_results.append(_score_case(case, run, judge_client=judge_client, context=context))
+            case_results.append(
+                _score_case(
+                    case, run, judge_client=judge_client, judge_model=judge_model, context=context
+                )
+            )
         except Exception as exc:  # noqa: BLE001 — resilience is the point here
             case_results.append(
                 CaseResult(
@@ -144,6 +158,7 @@ def main() -> None:
     parser.add_argument("--parquet", type=Path, help="Warehouse parquet (default: a fresh fixtures parquet)")
     args = parser.parse_args()
 
+    # --haiku is a true cheap mode: both the agent loops AND the judge use Haiku.
     model = "claude-haiku-4-5" if args.haiku else "claude-sonnet-4-6"
     client = anthropic.Anthropic()  # ANTHROPIC_API_KEY from env
     parquet = args.parquet or write_parquet(Path(".eval_fixtures/prices.parquet"))
@@ -154,6 +169,7 @@ def main() -> None:
         judge_client=client,
         context={"parquet": parquet},
         model=model,
+        judge_model=model,
     )
     _print_report(report)
     if args.report:

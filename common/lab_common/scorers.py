@@ -94,14 +94,14 @@ def score_deterministic(
     )
 
 
-def _judge_once(client: Any, rubric: str, candidate: str) -> float:
+def _judge_once(client: Any, rubric: str, candidate: str, model: str) -> float:
     prompt = (
         f"Rubric: {rubric}\n\n"
         f"Candidate response to evaluate:\n\"\"\"\n{candidate}\n\"\"\"\n\n"
         "Score how well the candidate meets the rubric from 0.0 to 1.0 and submit it."
     )
     response = client.messages.create(
-        model=JUDGE_MODEL,
+        model=model,
         max_tokens=300,
         tools=[_SUBMIT_SCORE_TOOL],
         tool_choice={"type": "tool", "name": "submit_score"},
@@ -112,11 +112,16 @@ def _judge_once(client: Any, rubric: str, candidate: str) -> float:
 
 
 def score_judge(
-    candidate: str | None, check: dict[str, Any], *, client: Any, runs: int = 3
+    candidate: str | None,
+    check: dict[str, Any],
+    *,
+    client: Any,
+    runs: int = 3,
+    judge_model: str = JUDGE_MODEL,
 ) -> CheckResult:
     if not candidate:
         return CheckResult("judge", False, 0.0, "no candidate text to judge")
-    scores = [_judge_once(client, check["rubric"], candidate) for _ in range(runs)]
+    scores = [_judge_once(client, check["rubric"], candidate, judge_model) for _ in range(runs)]
     median = statistics.median(scores)
     min_score = float(check.get("min_score", 0.7))
     passed = median >= min_score

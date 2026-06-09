@@ -31,6 +31,7 @@ def test_live_eval_runs_and_scores(fixtures_parquet: Path):
         judge_client=client,
         context={"parquet": fixtures_parquet},
         model="claude-haiku-4-5",
+        judge_model="claude-haiku-4-5",  # keep the smoke test cheap
     )
     assert report.skill == "factor_correlation"
     assert len(report.cases) == 3
