@@ -32,6 +32,7 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     needs: checks
+    if: github.event_name == 'pull_request'   # keyed eval gate runs on PRs only (bounds API cost)
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
