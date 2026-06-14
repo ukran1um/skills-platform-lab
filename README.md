@@ -12,6 +12,21 @@ Design: `docs/superpowers/specs/2026-06-06-skills-platform-lab-design.md`
     uv run python -m lab_data.ingest          # build the price warehouse (network)
     uv run pytest -q
 
+## Data MCP (the governed tool/data boundary)
+
+`services/data_mcp` is a FastMCP Streamable-HTTP server over the price warehouse. Every call
+carries a capability token (HS256 JWT: sub, skill, scopes, aud=data_mcp, 15-min exp). A
+missing/invalid token gets a `401` + `WWW-Authenticate: Bearer …` challenge at the transport;
+a valid token with the wrong scope gets an in-protocol error. Tools map to scopes:
+get_prices/get_returns → `prices:read`, get_fundamentals → `fundamentals:read`, run_query →
+`query:run`.
+
+Run it:  `CAPABILITY_SECRET=dev uv run python -m data_mcp.server`  (127.0.0.1:8081)
+
+Skills reach it via `get_client("data_mcp", token=…, base_url=…)`. `factor_correlation` keeps
+its laptop path (direct parquet) and adds a platform path (`get_prices_via_mcp`) that fetches
+through the governed server — the same skill, two execution contexts.
+
 ## Governance (CI as the gate)
 
 Every push runs four keyless governance gates (`lab_common.governance.cli check-all` +

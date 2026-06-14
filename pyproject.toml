@@ -5,7 +5,7 @@ description = "Governed skills platform prototype: registry monorepo, eval-gated
 requires-python = ">=3.12"
 
 [tool.uv.workspace]
-members = ["data", "skills/*", "common"]
+members = ["data", "skills/*", "common", "services/*"]
 
 [dependency-groups]
 dev = [

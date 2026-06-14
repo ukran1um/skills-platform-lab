@@ -59,6 +59,26 @@ def list_tickers(parquet: Path | None = None) -> list[str]:
     return [r[0] for r in rows]
 
 
+def get_prices_via_mcp(
+    tickers: list[str], start: date, end: date, *, token: str, base_url: str
+) -> pd.DataFrame:
+    """Platform-context fetch: go through the Data MCP (capability-token scoped) instead of
+    reading the parquet directly. Returns the same (ticker, date, close) rows shape."""
+    from lab_common.mcp import get_client  # lazy: keep MCP client deps off the laptop path
+
+    client = get_client("data_mcp", token=token, base_url=base_url)
+    rows = client.call_tool("get_prices", {
+        "tickers": [t.upper() for t in tickers],
+        "start": start.isoformat() if isinstance(start, date) else str(start),
+        "end": end.isoformat() if isinstance(end, date) else str(end),
+    })
+    df = pd.DataFrame(rows, columns=["ticker", "date", "close"]) if rows else pd.DataFrame(
+        columns=["ticker", "date", "close"])
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+    return df
+
+
 def run_sql(query: str, parquet: Path | None = None) -> pd.DataFrame:
     """Read-only SELECT against a view prices(ticker, date, close). SELECT/WITH only,
     single statement, no DDL/DML — enforced here, not trusted to the agent."""

@@ -129,3 +129,32 @@ Gotchas worth knowing:
 - ToolCorrectnessMetric (and other deepeval built-ins) instantiate a judge model at
   construction and default to GPTModel() → they demand OPENAI_API_KEY even when deterministic.
   Pass a no-op model for the keyless ones (handled in M2's _NoModel).
+
+## 2026-06-14 — M4: capability-token Data MCP server (the governed tool/data boundary)
+Built services/data_mcp: a FastMCP Streamable-HTTP server over the warehouse. Capability
+tokens (lab_common.capability, HS256 JWT: sub/skill/scopes/aud/15-min exp) are validated at
+the boundary. The two failure modes are deliberately distinct: a missing/invalid token is a
+TRANSPORT 401 + `WWW-Authenticate: Bearer resource_metadata=...` (Starlette middleware, the
+Stripe/RFC9728 pattern — verified live: `HTTP 401`, detail "missing bearer token"); an
+insufficient SCOPE on a valid token is an IN-PROTOCOL tool error ("scope denied: ..."). Tools
+map to scopes: get_prices/get_returns→prices:read, get_fundamentals→fundamentals:read,
+run_query→query:run. `get_client("data_mcp", token=, base_url=)` is now real (Streamable HTTP
++ bearer token). factor_correlation keeps its laptop path (direct parquet) and adds a platform
+path (get_prices_via_mcp) through the server — same skill, two execution contexts.
+
+Governance is now LOAD-BEARING: factor_correlation actually calls get_client("data_mcp"), so
+the M3 blast-radius scanner returns {data_mcp}, which IS declared in its allowed_mcp_servers →
+passes. If it reached an undeclared server, CI would reject it. The declaration finally bites.
+
+Gotchas:
+- `streamablehttp_client` (with the `headers=` kwarg) is the working client API; the
+  non-deprecated `streamable_http_client` has a DIFFERENT signature (no headers) — NOT a
+  drop-in. The deprecation warning is cosmetic; correctness > silencing it.
+- anyio wraps an exception raised inside a task group in nested ExceptionGroups on teardown of
+  streamablehttp_client; the sync DataMCPClient unwraps the single leaf so callers see the real
+  RuntimeError ("scope denied"), not an ExceptionGroup.
+- FastMCP's streamable_http_app has a Host-header check: TestClient (host "testserver") gets
+  421, but a real client to 127.0.0.1 is fine — so unit-test the 401 via the middleware
+  (TestClient asserts !=401) and prove the round-trip with a live uvicorn integration test.
+- All M4 tests are keyless (no LLM) — they run in the free `checks` gate, including the live
+  uvicorn integration tests (server in a daemon thread, readiness-polled, ephemeral port).

@@ -8,9 +8,9 @@ FACTOR = REPO_ROOT / "skills" / "factor_correlation"
 ROGUE = Path(__file__).resolve().parent / "fixtures" / "rogue_skill"
 
 
-def test_factor_correlation_references_no_servers():
+def test_factor_correlation_references_data_mcp():
     servers, warnings = referenced_mcp_servers(FACTOR)
-    assert servers == set() and warnings == []
+    assert servers == {"data_mcp"} and warnings == []
     assert check_blast_radius(load_skill(FACTOR), FACTOR) == []
 
 

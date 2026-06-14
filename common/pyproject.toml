@@ -12,6 +12,8 @@ dependencies = [
     "pyarrow>=16",
     "python-dotenv>=1.0",
     "pydantic>=2",
+    "mcp>=1.2",
+    "pyjwt>=2.8",
 ]
 
 [build-system]

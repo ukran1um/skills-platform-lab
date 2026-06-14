@@ -146,6 +146,8 @@ Minted by a `common/` helper at skill activation; validated by the Data MCP on e
 
 ### Data MCP tool surface
 
+> **M4 status (built):** `services/data_mcp` implements this as a FastMCP Streamable-HTTP server over the warehouse. The capability token is validated at the boundary by a Starlette middleware (missing/invalid → `401 + WWW-Authenticate: Bearer …`, verified live); per-tool scope is enforced in the tool impls as an in-protocol error ("scope denied"). `run_query` uses the shared `lab_common.sql_safety.validate_select_only` guard (regex, not sqlglot). `lab_common.mcp.get_client` is real; `factor_correlation` gained a platform path (`get_prices_via_mcp`) alongside its laptop path. (Non-goal still deferred: asymmetric JWKS — HS256 shared secret here.)
+
 All read-only, all token-checked:
 
 | Tool | Scope | Notes |
@@ -153,7 +155,7 @@ All read-only, all token-checked:
 | `get_prices(tickers, start, end)` | `prices:read` | |
 | `get_returns(tickers, window)` | `prices:read` | |
 | `get_fundamentals(ticker)` | `fundamentals:read` | May serve stub data; exists so the scope distinction between skills is enforceable |
-| `run_query(sql)` | `query:run` | Single-SELECT-only, validated by sqlglot parse. Neither blessed skill declares it — demonstrates an undeclared tool being invisible to the agent even though the server offers it |
+| `run_query(sql)` | `query:run` | Single-SELECT-only, validated by a regex guard (`lab_common.sql_safety`). Neither blessed skill declares it — demonstrates an undeclared tool being invisible to the agent even though the server offers it |
 
 Wire behavior (modeled on live-probed public servers, June 2026): Streamable HTTP transport, SSE-framed JSON-RPC responses, `401 + WWW-Authenticate: Bearer resource_metadata=...` challenge on missing/invalid token (the Stripe pattern), scope denial as an in-protocol JSON-RPC error. Both failure styles intentionally observable.
 
@@ -269,7 +271,7 @@ Static gates run before the eval gate so a lint failure never burns API spend. B
 | Component | Behavior |
 |---|---|
 | Skill host | Unknown skill or `status != blessed` → 403 with registry status in body. Expired token → 401, no silent re-mint. Agent-loop exception → structured error with partial trajectory attached. |
-| Data MCP | Missing/bad token → 401 + `WWW-Authenticate` challenge. Insufficient scope → JSON-RPC error naming the missing scope. `run_query` rejects anything that is not a single SELECT (sqlglot parse, not regex). |
+| Data MCP | Missing/bad token → 401 + `WWW-Authenticate` challenge. Insufficient scope → JSON-RPC error naming the missing scope. `run_query` rejects anything that is not a single SELECT (regex guard, `lab_common.sql_safety`). |
 | Eval harness | Per-case timeout (120s), one retry on API 5xx. An errored case scores 0 rather than aborting the run. |
 | CI | Eval gate always uploads the per-case JSON report as an artifact, pass or fail. |
 
