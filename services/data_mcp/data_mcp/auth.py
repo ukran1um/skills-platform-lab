@@ -17,7 +17,7 @@ from lab_common.capability import CapabilityError, verify
 
 AUDIENCE = "data_mcp"
 SECRET_ENV = "CAPABILITY_SECRET"
-DEFAULT_SECRET = "dev-secret-not-for-production"
+DEFAULT_SECRET = "dev-secret-not-for-production-pad32"  # >=32 bytes (avoids HS256 key-length warning)
 
 _CHALLENGE = 'Bearer resource_metadata="/.well-known/oauth-protected-resource"'
 
