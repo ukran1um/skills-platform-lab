@@ -1,0 +1,10 @@
+# Governance approval record (the stand-in for a council sign-off). git is the source of
+# truth; reconcile.py emits registry.json (deployed state). A skill is `blessed` only when
+# this record and the SKILL.md frontmatter agree.
+name: factor_correlation
+version: 0.1.0
+owner: egor
+blast_radius: low
+allowed_mcp_servers: [data_mcp]
+required_scopes: [prices:read]
+status: blessed
