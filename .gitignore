@@ -13,3 +13,4 @@ eval_report.json
 .env.*
 .deepeval/
 .deepeval-cache.json
+registry.json

@@ -19,3 +19,12 @@ jobs:
         run: uv run mypy .
       - name: Unit tests
         run: uv run pytest -q
+      - name: Governance gates
+        run: uv run python -m lab_common.governance.cli check-all
+      - name: Registry reconcile
+        run: uv run python -m lab_common.governance.cli reconcile --out registry.json
+      - name: Upload registry.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry
+          path: registry.json
