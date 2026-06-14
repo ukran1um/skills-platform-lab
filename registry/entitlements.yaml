@@ -1,0 +1,11 @@
+# The scope vocabulary the platform recognizes — the ceiling skills draw required_scopes
+# from. (The user->scopes map is illustrative; M5 uses it to mint capability tokens.)
+scopes:
+  - prices:read
+  - fundamentals:read
+  - query:run
+  - kb:read
+  - kb:write
+
+users:
+  egor: [prices:read, fundamentals:read, query:run, kb:read, kb:write]
