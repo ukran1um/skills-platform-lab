@@ -106,3 +106,26 @@ environment. The keyless CI gate is the cheap proxy for the hermetic container �
 fast on exactly the leak that would otherwise surface only after deploy. Lesson: run the gate
 in the cleanest environment you can (no ambient keys, no local config) so local convenience
 state can't mask a real dependency.
+
+## 2026-06-14 — M3: CI as governance (four keyless gates + a keyed eval job)
+Governance now runs in CI on every push: frontmatter schema, a blast-radius AST scan,
+scope-vocabulary validation, and a git→registry.json reconcile (a skill is `blessed` only
+when SKILL.md and registry/<skill>.yaml agree). These are model-free and keyless on purpose
+— cheap, deterministic, always-on. The live Agent-SDK+DeepEval eval is a SEPARATE keyed job
+scoped to pull_request only (bounds API cost; secrets ANTHROPIC/OPENAI in Actions; the job
+installs the `claude` CLI via npm so the SDK can spawn it).
+
+Blast-radius convention: a skill reaches a server via `lab_common.mcp.get_client("<server>")`;
+the AST scanner extracts the string-literal name and checks it against allowed_mcp_servers.
+factor_correlation references none (laptop context) so it's vacuously clean; the rogue_skill
+fixture calls get_client("notify_mcp") and is rejected while its frontmatter + scopes pass —
+the "passes gates 1 & 3, dies on gate 2" demo. Static analysis is best-effort: a non-literal
+get_client(var) is flagged, a syntax-error file fails cleanly (not a crash), and the runtime
+token + tool-injection layers (M4/M5) are the real backstop.
+
+Gotchas worth knowing:
+- Branch protection requires GitHub Pro on a PRIVATE repo (API 403: "Upgrade to Pro or make
+  this repository public"). The free path to enforced protection is to make the repo public.
+- ToolCorrectnessMetric (and other deepeval built-ins) instantiate a judge model at
+  construction and default to GPTModel() → they demand OPENAI_API_KEY even when deterministic.
+  Pass a no-op model for the keyless ones (handled in M2's _NoModel).
