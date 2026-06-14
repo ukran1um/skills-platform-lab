@@ -28,3 +28,22 @@ jobs:
         with:
           name: registry
           path: registry.json
+
+  eval:
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Claude CLI (the Agent SDK spawns it)
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Sync workspace
+        run: uv sync --all-packages
+      - name: Eval gate (live Agent SDK + DeepEval)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: uv run pytest -m eval -q
