@@ -146,6 +146,8 @@ Minted by a `common/` helper at skill activation; validated by the Data MCP on e
 
 ### Data MCP tool surface
 
+> **M4 status (built):** `services/data_mcp` implements this as a FastMCP Streamable-HTTP server over the warehouse. The capability token is validated at the boundary by a Starlette middleware (missing/invalid → `401 + WWW-Authenticate: Bearer …`, verified live); per-tool scope is enforced in the tool impls as an in-protocol error ("scope denied"). `run_query` uses the shared `lab_common.sql_safety.validate_select_only` guard (regex, not sqlglot). `lab_common.mcp.get_client` is real; `factor_correlation` gained a platform path (`get_prices_via_mcp`) alongside its laptop path. (Non-goal still deferred: asymmetric JWKS — HS256 shared secret here.)
+
 All read-only, all token-checked:
 
 | Tool | Scope | Notes |
