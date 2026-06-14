@@ -17,6 +17,7 @@ members = [
     "factor-correlation",
     "lab-common",
     "lab-data",
+    "lab-data-mcp",
     "skills-platform-lab",
 ]
 
@@ -988,6 +989,35 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=16" },
     { name = "yfinance", specifier = ">=0.2" },
+]
+
+[[package]]
+name = "lab-data-mcp"
+version = "0.1.0"
+source = { editable = "services/data_mcp" }
+dependencies = [
+    { name = "duckdb" },
+    { name = "lab-common" },
+    { name = "lab-data" },
+    { name = "mcp" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pyjwt" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb", specifier = ">=1.0" },
+    { name = "lab-common", editable = "common" },
+    { name = "lab-data", editable = "data" },
+    { name = "mcp", specifier = ">=1.2" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "pyarrow", specifier = ">=16" },
+    { name = "pyjwt", specifier = ">=2.8" },
+    { name = "starlette", specifier = ">=0.37" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [[package]]
@@ -2407,8 +2437,8 @@ name = "uvicorn"
 version = "0.49.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "sys_platform != 'emscripten'" },
-    { name = "h11", marker = "sys_platform != 'emscripten'" },
+    { name = "click" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/1f/fa18009dea8469069cca78a4e877a008ab78f08b064bfc9ab891579077ff/uvicorn-0.49.0.tar.gz", hash = "sha256:ebf4271aa580d9de97f93192d4595176df6e91f9aae919ca73e4fc07df1e66a3", size = 91284 }
 wheels = [
