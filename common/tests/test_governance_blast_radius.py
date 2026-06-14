@@ -35,3 +35,23 @@ def test_dynamic_server_name_is_flagged(tmp_path: Path):
     )
     _, warnings = referenced_mcp_servers(pkg)
     assert any("non-literal" in w for w in warnings)
+
+
+def test_keyword_arg_server_name_is_extracted(tmp_path: Path):
+    pkg = tmp_path / "kw"
+    pkg.mkdir()
+    (pkg / "code.py").write_text(
+        "from lab_common.mcp import get_client\n"
+        "def f():\n    return get_client(server_name='notify_mcp')\n"
+    )
+    servers, warnings = referenced_mcp_servers(pkg)
+    assert servers == {"notify_mcp"} and warnings == []  # keyword form must resolve, not warn
+
+
+def test_syntax_error_is_a_clean_failure_not_a_crash(tmp_path: Path):
+    pkg = tmp_path / "broken"
+    pkg.mkdir()
+    (pkg / "code.py").write_text("def f(:\n    pass\n")  # invalid syntax
+    servers, warnings = referenced_mcp_servers(pkg)  # must not raise
+    assert servers == set()
+    assert any("SyntaxError" in w for w in warnings)

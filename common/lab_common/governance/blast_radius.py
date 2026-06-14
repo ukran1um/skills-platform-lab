@@ -13,6 +13,9 @@ from pathlib import Path
 
 from lab_common.models import SkillSpec
 
+# Matched by function NAME (so get_client(...) and x.get_client(...) both match). This is
+# deliberately broad: a skill that defines its own unrelated get_client() gets flagged, which
+# is the conservative (over-block) outcome — a CI gate must not have false negatives.
 _MCP_CLIENT_FUNCS = {"get_client", "get_mcp_client", "mcp_client"}
 
 
@@ -24,6 +27,16 @@ def _func_name(func: ast.expr) -> str | None:
     return None
 
 
+def _literal_server(node: ast.Call) -> str | None:
+    """Extract the server name from get_client('x') or get_client(server_name='x')."""
+    if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+        return node.args[0].value
+    for kw in node.keywords:
+        if kw.arg == "server_name" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+            return kw.value.value
+    return None
+
+
 def referenced_mcp_servers(skill_dir: str | Path) -> tuple[set[str], list[str]]:
     """Return (servers referenced via get_client('literal'), warnings for dynamic refs).
 
@@ -32,27 +45,34 @@ def referenced_mcp_servers(skill_dir: str | Path) -> tuple[set[str], list[str]]:
     warnings: list[str] = []
     root = Path(skill_dir).resolve()
     for py in sorted(root.rglob("*.py")):
-        rel_parts = py.relative_to(root).parts
-        if "tests" in rel_parts:
+        rel = py.relative_to(root)
+        if "tests" in rel.parts:
             continue
-        tree = ast.parse(py.read_text(), filename=str(py))
+        try:
+            tree = ast.parse(py.read_text(), filename=str(py))
+        except SyntaxError as exc:
+            # A malformed skill file is a clean governance failure, not a runner crash.
+            warnings.append(f"{rel}:{exc.lineno}: SyntaxError: {exc.msg}")
+            continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
             if _func_name(node.func) not in _MCP_CLIENT_FUNCS:
                 continue
-            if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-                servers.add(node.args[0].value)
+            server = _literal_server(node)
+            if server is not None:
+                servers.add(server)
             else:
                 warnings.append(
-                    f"{py.name}:{node.lineno}: get_client() called with a non-literal "
+                    f"{rel}:{node.lineno}: get_client() called with a non-literal "
                     "server name (cannot verify statically)"
                 )
     return servers, warnings
 
 
 def check_blast_radius(spec: SkillSpec, skill_dir: str | Path) -> list[str]:
-    """Errors if the code reaches a server not in allowed_mcp_servers."""
+    """Errors if the code reaches a server not in allowed_mcp_servers, or if any
+    get_client call uses a non-literal server name / a file fails to parse."""
     referenced, warnings = referenced_mcp_servers(skill_dir)
     allowed = set(spec.allowed_mcp_servers)
     undeclared = referenced - allowed
