@@ -11,6 +11,19 @@ import json
 from typing import Any
 
 
+def _unwrap_exception_group(eg: BaseException) -> BaseException | None:
+    """Recursively extract a single leaf exception from a (possibly nested) ExceptionGroup.
+
+    anyio wraps exceptions raised inside task groups in one or more ExceptionGroup layers.
+    This returns the innermost non-group exception when there is exactly one, so callers
+    can `raise` it directly and `pytest.raises` / user code can match it normally."""
+    if isinstance(eg, BaseExceptionGroup):
+        if len(eg.exceptions) == 1:
+            return _unwrap_exception_group(eg.exceptions[0])
+        return None
+    return eg
+
+
 class DataMCPClient:
     def __init__(self, server_name: str, token: str, base_url: str) -> None:
         self.server_name = server_name
@@ -27,14 +40,24 @@ class DataMCPClient:
                 await session.initialize()
                 result = await session.call_tool(tool, arguments=arguments)
                 if result.isError:
-                    text = result.content[0].text if result.content else "tool error"
+                    first = result.content[0] if result.content else None
+                    text = first.text if hasattr(first, "text") else "tool error"  # type: ignore[union-attr]
                     raise RuntimeError(f"{tool} failed: {text}")
-                text = result.content[0].text if result.content else "null"
+                first = result.content[0] if result.content else None
+                text = first.text if hasattr(first, "text") else "null"  # type: ignore[union-attr]
                 return json.loads(text)
 
     def call_tool(self, tool: str, arguments: dict[str, Any]) -> Any:
         """Sync wrapper: run the async MCP call. (Not for use inside a running event loop.)"""
-        return asyncio.run(self._call_async(tool, arguments))
+        try:
+            return asyncio.run(self._call_async(tool, arguments))
+        except BaseExceptionGroup as eg:
+            # anyio task groups wrap exceptions (possibly nested); unwrap so callers
+            # can catch RuntimeError("scope denied" / "failed") without ExceptionGroup.
+            cause = _unwrap_exception_group(eg)
+            if cause is not None:
+                raise cause from eg
+            raise
 
 
 def get_client(server_name: str, *, token: str | None = None, base_url: str | None = None) -> DataMCPClient:
