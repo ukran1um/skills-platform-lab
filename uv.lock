@@ -948,9 +948,11 @@ dependencies = [
     { name = "anthropic" },
     { name = "claude-agent-sdk" },
     { name = "deepeval" },
+    { name = "mcp" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
+    { name = "pyjwt" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
@@ -960,9 +962,11 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.40" },
     { name = "claude-agent-sdk", specifier = ">=0.2" },
     { name = "deepeval", specifier = ">=4.0" },
+    { name = "mcp", specifier = ">=1.2" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=16" },
     { name = "pydantic", specifier = ">=2" },
+    { name = "pyjwt", specifier = ">=2.8" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
