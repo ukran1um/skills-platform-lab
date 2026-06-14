@@ -9,7 +9,7 @@ def _spec(**over) -> SkillSpec:
         golden_set="evals/golden.yaml", threshold=0.8, system_prompt="body",
     )
     base.update(over)
-    return SkillSpec(**base)
+    return SkillSpec(**base)  # type: ignore[arg-type]
 
 
 def test_valid_frontmatter_has_no_errors():

@@ -32,7 +32,8 @@ def check_frontmatter(spec: SkillSpec) -> list[str]:
     try:
         Frontmatter(
             name=spec.name, version=spec.version, owner=spec.owner,
-            blast_radius=spec.blast_radius, allowed_mcp_servers=spec.allowed_mcp_servers,
+            blast_radius=spec.blast_radius,  # type: ignore[arg-type]
+            allowed_mcp_servers=spec.allowed_mcp_servers,
             required_scopes=spec.required_scopes, golden_set=spec.golden_set,
             threshold=spec.threshold,
         )
