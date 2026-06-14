@@ -32,6 +32,8 @@ class DataMCPClient:
 
     async def _call_async(self, tool: str, arguments: dict[str, Any]) -> Any:
         from mcp import ClientSession
+        # streamablehttp_client (with the headers kwarg) is the working API here; the newer
+        # streamable_http_client has a different signature (no headers). The deprecation is cosmetic.
         from mcp.client.streamable_http import streamablehttp_client
 
         headers = {"Authorization": f"Bearer {self._token}"}

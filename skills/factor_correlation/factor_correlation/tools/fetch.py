@@ -59,14 +59,12 @@ def list_tickers(parquet: Path | None = None) -> list[str]:
     return [r[0] for r in rows]
 
 
-def get_prices_via_mcp(tickers, start, end, *, token: str, base_url: str):
+def get_prices_via_mcp(
+    tickers: list[str], start: date, end: date, *, token: str, base_url: str
+) -> pd.DataFrame:
     """Platform-context fetch: go through the Data MCP (capability-token scoped) instead of
     reading the parquet directly. Returns the same (ticker, date, close) rows shape."""
-    from datetime import date
-
-    import pandas as pd
-
-    from lab_common.mcp import get_client
+    from lab_common.mcp import get_client  # lazy: keep MCP client deps off the laptop path
 
     client = get_client("data_mcp", token=token, base_url=base_url)
     rows = client.call_tool("get_prices", {
