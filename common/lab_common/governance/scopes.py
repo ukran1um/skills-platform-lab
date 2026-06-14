@@ -11,7 +11,13 @@ from lab_common.models import SkillSpec
 
 def load_scope_vocab(entitlements_path: str | Path) -> set[str]:
     data = yaml.safe_load(Path(entitlements_path).read_text()) or {}
-    return set(data.get("scopes", []))
+    vocab = set(data.get("scopes", []))
+    if not vocab:
+        raise ValueError(
+            f"{entitlements_path}: no scopes defined — an empty vocabulary would reject "
+            "every skill's required_scopes"
+        )
+    return vocab
 
 
 def check_scopes(spec: SkillSpec, vocab: set[str]) -> list[str]:

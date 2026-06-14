@@ -25,3 +25,12 @@ def test_unknown_scope_is_rejected():
     vocab = load_scope_vocab(ENTITLEMENTS)
     errs = check_scopes(_spec(["prices:read", "trading:write"]), vocab)
     assert any("trading:write" in e for e in errs)
+
+
+def test_empty_vocab_raises_rather_than_silently_over_blocking(tmp_path: Path):
+    import pytest
+
+    empty = tmp_path / "entitlements.yaml"
+    empty.write_text("scopes: []\n")
+    with pytest.raises(ValueError, match="no scopes defined"):
+        load_scope_vocab(empty)

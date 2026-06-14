@@ -12,6 +12,9 @@ from lab_common.models import SkillSpec
 from lab_common.skill_spec import load_skill
 
 _AGREE_FIELDS = ("name", "version", "blast_radius", "allowed_mcp_servers", "required_scopes")
+# These are declarative sets of entitlements, not ordered sequences — compare order-insensitively.
+_SET_FIELDS = {"allowed_mcp_servers", "required_scopes"}
+_VALID_STATUSES = {"candidate", "blessed", "deprecated"}
 
 
 def _agreement_errors(spec: SkillSpec, record: dict[str, Any]) -> list[str]:
@@ -19,8 +22,12 @@ def _agreement_errors(spec: SkillSpec, record: dict[str, Any]) -> list[str]:
     for field in _AGREE_FIELDS:
         sv = getattr(spec, field)
         rv = record.get(field)
-        sv_n = list(sv) if isinstance(sv, list) else sv
-        rv_n = list(rv) if isinstance(rv, list) else rv
+        sv_n: Any
+        rv_n: Any
+        if field in _SET_FIELDS:
+            sv_n, rv_n = sorted(sv or []), sorted(rv or [])
+        else:
+            sv_n, rv_n = sv, rv
         if sv_n != rv_n:
             errors.append(f"{field}: SKILL.md={sv_n!r} != registry={rv_n!r}")
     return errors
@@ -31,6 +38,9 @@ def reconcile_skill(skill_dir: str | Path, registry_path: str | Path, source_com
     record = yaml.safe_load(Path(registry_path).read_text()) or {}
     errors = _agreement_errors(spec, record)
     declared = record.get("status", "candidate")
+    if declared not in _VALID_STATUSES:
+        errors.append(f"status: unknown value {declared!r} (must be one of {sorted(_VALID_STATUSES)})")
+        declared = "candidate"
     status = declared if not errors else "candidate"
     return {
         "name": spec.name, "version": spec.version, "owner": spec.owner,

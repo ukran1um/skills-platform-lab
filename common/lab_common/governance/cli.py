@@ -34,6 +34,21 @@ def check_skill(skill_dir: str | Path, entitlements: str | Path) -> dict[str, li
     }
 
 
+def check_all_results(
+    skills_dir: str | Path, entitlements: str | Path
+) -> list[tuple[str, dict[str, list[str]] | None, str | None]]:
+    """For each skill dir with a SKILL.md: (name, results, error). One malformed skill
+    (load_skill raises) is captured as an error so check-all reports it and keeps going,
+    rather than aborting the whole run."""
+    out: list[tuple[str, dict[str, list[str]] | None, str | None]] = []
+    for skill in sorted(d for d in Path(skills_dir).iterdir() if (d / "SKILL.md").exists()):
+        try:
+            out.append((skill.name, check_skill(skill, entitlements), None))
+        except Exception as exc:  # noqa: BLE001 — one bad skill must not abort the gate
+            out.append((skill.name, None, str(exc)))
+    return out
+
+
 def _print_skill(name: str, results: dict[str, list[str]]) -> bool:
     ok = True
     for gate, errs in results.items():
@@ -81,8 +96,13 @@ def main() -> None:
 
     if args.cmd == "check-all":
         all_ok = True
-        for skill in sorted(d for d in Path(args.skills).iterdir() if (d / "SKILL.md").exists()):
-            all_ok = _print_skill(skill.name, check_skill(skill, args.entitlements)) and all_ok
+        for name, results, error in check_all_results(args.skills, args.entitlements):
+            if error is not None:
+                all_ok = False
+                print(f"  [ERROR] {name}: {error}")
+            else:
+                assert results is not None
+                all_ok = _print_skill(name, results) and all_ok
         sys.exit(0 if all_ok else 1)
 
     if args.cmd == "reconcile":
