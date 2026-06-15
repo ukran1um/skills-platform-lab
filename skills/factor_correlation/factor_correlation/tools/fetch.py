@@ -79,6 +79,20 @@ def get_prices_via_mcp(
     return df
 
 
+def get_prices_auto(
+    tickers: list[str], start: date, end: date, parquet: Path | None = None
+) -> pd.DataFrame:
+    """Route the price fetch by execution context. Platform context (set by the skill host) ->
+    the governed Data MCP, capability-scoped. Laptop context -> direct parquet. Same row shape."""
+    from lab_common.exec_context import platform_context
+
+    ctx = platform_context()
+    if ctx is not None:
+        base_url, token = ctx
+        return get_prices_via_mcp(tickers, start, end, token=token, base_url=base_url)
+    return get_prices(tickers, start, end, parquet=parquet)
+
+
 def run_sql(query: str, parquet: Path | None = None) -> pd.DataFrame:
     """Read-only SELECT against a view prices(ticker, date, close). SELECT/WITH only,
     single statement, no DDL/DML — enforced here, not trusted to the agent."""
