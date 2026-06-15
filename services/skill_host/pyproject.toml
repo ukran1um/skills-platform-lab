@@ -1,0 +1,22 @@
+[project]
+name = "skill-host"
+version = "0.1.0"
+description = "Runs blessed skills server-side with scoped, governed MCP access"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",
+    "pyyaml>=6",
+    "lab-common",
+]
+
+[tool.uv.sources]
+lab-common = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["skill_host"]

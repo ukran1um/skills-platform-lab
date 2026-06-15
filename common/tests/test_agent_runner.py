@@ -27,3 +27,24 @@ def test_build_runresult_extracts_text_from_list_content():
     tool_results = {"id1": [{"type": "text", "text": '{"rows": []}'}]}
     run = build_runresult(tool_uses, tool_results, final_text="x")
     assert run.trajectory[0].result == '{"rows": []}'
+
+
+def test_build_runresult_strips_any_server_prefix():
+    # Trajectory parsing must be server-name-agnostic (works for mcp__brief__ too).
+    from lab_common.agent_runner import build_runresult
+    rr = build_runresult(
+        tool_uses=[("t1", "mcp__brief__get_market_data", {"ticker": "AAPL"})],
+        tool_results={"t1": "{}"},
+        final_text="ok",
+    )
+    assert rr.trajectory[0].name == "get_market_data"
+
+
+def test_make_sdk_runner_accepts_server_name():
+    # The closure must accept the server_name kwarg without constructing the SDK.
+    from lab_common.agent_runner import make_sdk_runner
+    from lab_common.models import SkillSpec
+    spec = SkillSpec(name="x", version="0", owner="", blast_radius="", allowed_mcp_servers=[],
+                     required_scopes=[], golden_set="", threshold=0.0, system_prompt="p")
+    runner = make_sdk_runner(spec, {"type": "sdk"}, ["mcp__brief__x"], server_name="brief")
+    assert callable(runner)

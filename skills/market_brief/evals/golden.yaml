@@ -1,0 +1,33 @@
+cases:
+  - id: brief_aapl
+    input: "Give me a short brief on AAPL from 2025-01-01 to 2025-03-31."
+    checks:
+      - type: tool_correctness
+        expected_tools: [get_market_data]
+        exact_match: true
+      - type: geval
+        name: brief_quality
+        criteria: >
+          The answer is a short brief on AAPL that names the ticker and the date window and
+          describes the price move over the period (direction and rough magnitude). Judge
+          presentation and completeness only; do NOT verify any numeric value or treat
+          unverifiable figures as fabricated.
+        threshold: 0.7
+      - type: answer_relevancy
+        threshold: 0.7
+
+  - id: brief_msft
+    input: "Brief me on MSFT's price action between 2025-01-01 and 2025-03-31."
+    checks:
+      - type: tool_correctness
+        expected_tools: [get_market_data]
+        exact_match: true
+      - type: geval
+        name: brief_quality
+        criteria: >
+          The answer is a short brief on MSFT that names the ticker and the date window and
+          describes the period's price move. Judge presentation and completeness only; do NOT
+          verify numbers.
+        threshold: 0.7
+      - type: task_completion
+        threshold: 0.7

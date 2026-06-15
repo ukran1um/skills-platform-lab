@@ -75,6 +75,8 @@ skills-platform-lab/
 
 In platform context the Data MCP is the only path to the warehouse. In laptop context the skill reads parquet directly, on purpose, so the promotion diff is visible.
 
+> **M5 status (built):** `services/skill_host` is a FastAPI service (`POST /run {skill, message, user}`). It loads a skill only if `reconcile` reports it `blessed`, mints a least-privilege capability token (the user must hold every scope the skill declares; token carries exactly those), injects the platform context (`DATA_MCP_URL`/`DATA_MCP_TOKEN` via `lab_common.exec_context`, serialized by a host lock), and runs the async Agent-SDK loop. Skills are context-portable: `platform_context()` routes data access through the governed Data MCP (platform) or direct parquet (laptop). `market_brief` (prices:read + fundamentals:read) is the second blessed skill — the two-scope set and the `get_client("data_mcp")` declaration are now load-bearing for more than one skill. Host *logic* tests are keyless; the full HTTP→host→agent→Data-MCP round-trip is one eval-marked live test.
+
 ### The skills
 
 | | `factor_correlation` | `market_brief` | `rogue_skill` (PR only, never merged) |

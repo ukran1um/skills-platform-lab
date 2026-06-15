@@ -158,3 +158,23 @@ Gotchas:
   (TestClient asserts !=401) and prove the round-trip with a live uvicorn integration test.
 - All M4 tests are keyless (no LLM) — they run in the free `checks` gate, including the live
   uvicorn integration tests (server in a daemon thread, readiness-polled, ephemeral port).
+
+## M5 — skill host + promotion demo (2026-06-14)
+
+- **The host is a governance wrapper around the runtime, not new runtime.** It reuses `run_skill`
+  unchanged; its value is the gates: blessed-only load (`reconcile`), least-privilege token mint
+  (user must hold every declared scope), and platform-context injection. Made the orchestration
+  testable offline by injecting the runner — the agent loop is faked in the keyless gate and run
+  for real only in the eval gate.
+- **Platform context via env vars, not contextvars.** The Agent SDK runs in-process tools in the
+  host process, so env set before the run is visible to them — the proven `$PRICES_PARQUET`
+  mechanism. contextvar propagation across the SDK's tool execution was the riskier bet; env is
+  process-global and certain. Cost: it's global, so the host serializes runs with a lock. A
+  production runtime would isolate per call (worker/container per invocation).
+- **A second skill made the abstractions load-bearing.** With only `factor_correlation`, the
+  scope set and `allowed_mcp_servers` were a sample size of one. `market_brief` (prices:read +
+  fundamentals:read) forced the token mint to actually intersect scopes and proved the blast-radius
+  declaration generalizes. `get_prices_auto` / `platform_context()` is the seam that makes one
+  skill definition run in two execution contexts — the whole point of the design.
+- **Generalized the hardcoded `mcp__factor__` key** to a per-skill `SERVER_NAME` so the second
+  skill's tools read as `mcp__brief__…`; `build_runresult` already stripped any prefix.

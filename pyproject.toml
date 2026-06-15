@@ -22,11 +22,17 @@ target-version = "py312"
 python_version = "3.12"
 ignore_missing_imports = true
 exclude = ["\\.venv"]
+# Each skill ships its own tests/ with the same basenames (e.g. test_fetch.py); without this
+# mypy can't disambiguate same-named modules across skills. Treat dirs on the path as bases.
+explicit_package_bases = true
+namespace_packages = true
 
 [tool.pytest.ini_options]
 # Anchor rootdir at the repo root so the workspace-wide conftest.py is always loaded.
 # Default run excludes live evals (they call the Anthropic API); run them with `pytest -m eval`.
-addopts = "-m 'not eval'"
+# importlib import mode: lets each skill ship a tests/ with the same basenames (test_fetch.py
+# etc.) without sys.path basename collisions (the default prepend mode rejects duplicates).
+addopts = "-m 'not eval' --import-mode=importlib"
 markers = [
     "eval: live evals that call the Anthropic API (needs ANTHROPIC_API_KEY); deselected by default",
 ]

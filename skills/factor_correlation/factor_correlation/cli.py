@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from factor_correlation.tools.compute import correlation_matrix
-from factor_correlation.tools.fetch import get_prices
+from factor_correlation.tools.fetch import get_prices_auto
 
 
 def run(
@@ -17,7 +17,7 @@ def run(
 ) -> dict[str, Any]:
     # `parquet` lets a caller (e.g. the M2 eval harness) point at a fixtures
     # warehouse without touching $PRICES_PARQUET; None falls through to the default.
-    prices = get_prices(tickers, start, end, parquet=parquet)
+    prices = get_prices_auto(tickers, start, end, parquet=parquet)
     if prices.empty:
         raise SystemExit(f"no price data for {tickers} between {start} and {end}")
     corr = correlation_matrix(prices)

@@ -112,7 +112,8 @@ def main() -> None:
 
     spec = load_skill(args.skill_dir)
     mod = importlib.import_module(f"{spec.name}.agent_tools")
-    runner = make_sdk_runner(spec, mod.SERVER, mod.ALLOWED_TOOLS, model)
+    runner = make_sdk_runner(spec, mod.SERVER, mod.ALLOWED_TOOLS, model,
+                             server_name=getattr(mod, "SERVER_NAME", "factor"))
     judge, judge_label = make_judge()
 
     report = run_evals(args.skill_dir, runner=runner, judge=judge, parquet=parquet)

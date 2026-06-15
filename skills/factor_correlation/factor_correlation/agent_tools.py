@@ -16,7 +16,7 @@ from claude_agent_sdk import create_sdk_mcp_server, tool
 
 from factor_correlation.cli import run
 from factor_correlation.tools.compute import returns_stats
-from factor_correlation.tools.fetch import get_prices, list_tickers, run_sql
+from factor_correlation.tools.fetch import get_prices_auto, list_tickers, run_sql
 
 
 def _list_tickers_impl() -> str:
@@ -37,8 +37,8 @@ def _compute_correlation_impl(args: dict[str, Any]) -> str:
 
 def _returns_stats_impl(args: dict[str, Any]) -> str:
     try:
-        prices = get_prices([args["ticker"]], date.fromisoformat(args["start"]),
-                            date.fromisoformat(args["end"]))
+        prices = get_prices_auto([args["ticker"]], date.fromisoformat(args["start"]),
+                                 date.fromisoformat(args["end"]))
         if prices.empty:
             return json.dumps({"error": f"no data for {args['ticker']}"})
         return json.dumps(returns_stats(prices))
@@ -82,6 +82,8 @@ async def _returns_stats_tool(args: Any) -> dict[str, Any]:
 async def _run_sql_tool(args: Any) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": _run_sql_impl(args)}]}
 
+
+SERVER_NAME = "factor"
 
 SERVER = create_sdk_mcp_server(
     name="factor", version="1.0.0",
