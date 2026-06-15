@@ -53,3 +53,13 @@ def test_unentitled_user_is_403():
     client = TestClient(create_app(config=_cfg(), runner=_fake_runner))
     r = client.post("/run", json={"skill": "factor_correlation", "message": "x", "user": "nobody"})
     assert r.status_code == 403
+
+
+def test_default_config_reads_data_mcp_base_url_env(monkeypatch):
+    from skill_host.app import default_config
+    from skill_host.host import DEFAULT_DATA_MCP_BASE_URL
+
+    monkeypatch.delenv("DATA_MCP_BASE_URL", raising=False)
+    assert default_config().data_mcp_base_url == DEFAULT_DATA_MCP_BASE_URL
+    monkeypatch.setenv("DATA_MCP_BASE_URL", "http://data-mcp.example:9000/mcp")
+    assert default_config().data_mcp_base_url == "http://data-mcp.example:9000/mcp"
