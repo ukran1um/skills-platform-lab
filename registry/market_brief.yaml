@@ -1,0 +1,8 @@
+# Governance approval record for market_brief (see registry/factor_correlation.yaml).
+name: market_brief
+version: 0.1.0
+owner: egor
+blast_radius: low
+allowed_mcp_servers: [data_mcp]
+required_scopes: [prices:read, fundamentals:read]
+status: blessed
