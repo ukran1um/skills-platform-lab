@@ -27,6 +27,23 @@ Skills reach it via `get_client("data_mcp", token=…, base_url=…)`. `factor_c
 its laptop path (direct parquet) and adds a platform path (`get_prices_via_mcp`) that fetches
 through the governed server — the same skill, two execution contexts.
 
+## Skill host (the platform runtime)
+
+`services/skill_host` runs a *blessed* skill server-side. `POST /run {skill, message, user}`:
+loads the skill only if `reconcile` reports it `blessed`, mints a least-privilege capability
+token (the user must hold every scope the skill declares), injects the Data MCP URL + token so
+the skill's tools fetch through the governed server (platform context), runs the Agent-SDK
+loop, and returns the final text + trajectory. Unknown skill → 404; not blessed or missing
+entitlement → 403.
+
+Run it:  `uv run python -m skill_host.app`  (127.0.0.1:8082; point it at the Data MCP via
+`DATA_MCP_BASE_URL`, share `CAPABILITY_SECRET` with the server).
+
+The same skill runs in two contexts: a laptop reads the parquet directly; the host routes the
+same skill through the Data MCP. `market_brief` is a second blessed skill (prices + fundamentals)
+authored through the full promotion path — local code → PR → governance gates + evals → blessed
+→ runnable in the host.
+
 ## Governance (CI as the gate)
 
 Every push runs four keyless governance gates (`lab_common.governance.cli check-all` +
