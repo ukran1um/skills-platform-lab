@@ -83,6 +83,8 @@ async def _run_sql_tool(args: Any) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": _run_sql_impl(args)}]}
 
 
+SERVER_NAME = "factor"
+
 SERVER = create_sdk_mcp_server(
     name="factor", version="1.0.0",
     tools=[_list_tickers_tool, _compute_correlation_tool, _returns_stats_tool, _run_sql_tool],

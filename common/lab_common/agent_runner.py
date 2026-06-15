@@ -48,6 +48,7 @@ async def run_skill(
     allowed_tools: list[str],
     model: str = DEFAULT_MODEL,
     max_turns: int = DEFAULT_MAX_TURNS,
+    server_name: str = "factor",
 ) -> RunResult:
     from claude_agent_sdk import (
         AssistantMessage,
@@ -61,7 +62,7 @@ async def run_skill(
     )
 
     opts = ClaudeAgentOptions(
-        mcp_servers={"factor": server},
+        mcp_servers={server_name: server},
         allowed_tools=allowed_tools,
         system_prompt=spec.system_prompt,      # str => REPLACES the default Claude Code prompt
         model=model,
@@ -92,7 +93,8 @@ async def run_skill(
 
 
 def make_sdk_runner(
-    spec: SkillSpec, server: Any, allowed_tools: list[str], model: str = DEFAULT_MODEL
+    spec: SkillSpec, server: Any, allowed_tools: list[str], model: str = DEFAULT_MODEL,
+    *, server_name: str = "factor",
 ) -> Callable[[str], RunResult]:
     """A sync runner(input)->RunResult that runs the async SDK query per call.
 
@@ -101,5 +103,6 @@ def make_sdk_runner(
     """
     def runner(user_input: str) -> RunResult:
         return asyncio.run(run_skill(spec, user_input, server=server,
-                                     allowed_tools=allowed_tools, model=model))
+                                     allowed_tools=allowed_tools, model=model,
+                                     server_name=server_name))
     return runner
